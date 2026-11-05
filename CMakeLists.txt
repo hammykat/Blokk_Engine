@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.25)
 
 project(Blokk
-    VERSION 0.1.8
+    VERSION 0.1.9
     LANGUAGES CXX
 )
 
@@ -18,20 +18,22 @@ add_subdirectory(vendored/SDL)
 # SDL_image
 add_subdirectory(vendored/SDL_image)
 
+# Vulkan
+# Find the official Vulkan SDK on the system
+find_package(Vulkan REQUIRED)
+
+# Add the vk-bootstrap submodule directory
+add_subdirectory(vendored/vk-bootstrap)
+
+# GLM Math Library
+add_subdirectory(vendored/glm)
+
 # GLFW - Turn off unwanted targets to keep compilation fast
 set(GLFW_BUILD_DOCS OFF CACHE INTERNAL "")
 set(GLFW_BUILD_TESTS OFF CACHE INTERNAL "")
 set(GLFW_BUILD_EXAMPLES OFF CACHE INTERNAL "")
 add_subdirectory(vendored/glfw)
 
-# Glad - GLFW loader
-add_library(glad STATIC
-    vendored/glad/src/glad.c
-)
-target_include_directories(glad
-    PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/vendored/glad/include
-)
 
 # Imgui
 add_library(imgui STATIC
@@ -40,8 +42,8 @@ add_library(imgui STATIC
     vendored/imgui/imgui_tables.cpp
     vendored/imgui/imgui_widgets.cpp
 
-    vendored/imgui/backends/imgui_impl_sdl3.cpp
-    vendored/imgui/backends/imgui_impl_sdlrenderer3.cpp
+    vendored/imgui/backends/imgui_impl_sdl3.cpp # For SDL3
+    vendored/imgui/backends/imgui_impl_vulkan.cpp # Needed to use Vulkan
 )
 
 target_include_directories(imgui
@@ -53,10 +55,12 @@ target_include_directories(imgui
 target_link_libraries(imgui
     PUBLIC
         SDL3::SDL3
+        Vulkan::Vulkan # ImGui Vulkan backend needs access to Vulkan headers
 )
 
 # xsimd
 add_subdirectory(vendored/xsimd EXCLUDE_FROM_ALL)
+
 
 # BFCL
 add_subdirectory(vendored/BFCL)

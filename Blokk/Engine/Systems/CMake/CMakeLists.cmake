@@ -19,6 +19,7 @@ target_include_directories(Blokk
         ${CMAKE_CURRENT_SOURCE_DIR}/../../GameObjects
         ${CMAKE_CURRENT_SOURCE_DIR}/../../Helpers
         ${CMAKE_CURRENT_SOURCE_DIR}/..
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../vendored/glm/glm
 )
 
 target_link_libraries(Blokk
@@ -29,6 +30,7 @@ target_link_libraries(Blokk
         BFCL
         glfw
         glad
+        glm::glm
 )
 
 # SIMD DETECTOR -------------------------------------------------------------

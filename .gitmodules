@@ -13,3 +13,18 @@
 [submodule "vendored/glfw"]
 	path = vendored/glfw
 	url = https://github.com/glfw/glfw
+[submodule "vendored/VMA"]
+	path = vendored/VMA
+	url = https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator
+[submodule "vendored/volk"]
+	path = vendored/volk
+	url = https://github.com/zeux/volk
+[submodule "vendored/vk-bootstrap"]
+	path = vendored/vk-bootstrap
+	url = https://github.com/charles-lunarg/vk-bootstrap
+[submodule "vendored/imgui"]
+	path = vendored/imgui
+	url = https://github.com/ocornut/imgui
+[submodule "vendored/glm"]
+	path = vendored/glm
+	url = https://github.com/g-truc/glm.git
