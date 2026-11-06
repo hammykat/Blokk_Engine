@@ -1,12 +1,23 @@
 #pragma once
 
 #include <SDL3/SDL.h>
-#include <cstdint>
-#include <stdlib.h>
-#include <stdbool.h>
-#include <vector>
-#include <string>
 #include <concepts>
+#include <cstdint>
+#include <iostream>
+#include <stdbool.h>
+#include <stdlib.h>
+#include <string>
+#include <vector>
+
+#include <glm/glm.hpp>
+
+#ifdef Blokk_Debug_Enabled
+#define AssertWhenDebug(condition, msg) \
+    do { if (!(condition)) throw std::runtime_error(msg); } while (0) 
+#else 
+// In Release mode, this turns into an empty statement and ignores 'msg' entirely
+#define AssertWhenDebug(condition, msg) do { } while (0)
+#endif
 
 namespace Blokk {
    
@@ -164,6 +175,13 @@ struct ObjectCreationParams {
     bool visible;
     vector2<float> velocity;
     vector2<float> position;
+};
+
+struct ConstantFrameData {
+    int32_t objectCounts[3]; // Total, Static, Dynamic
+    glm::vec2 cameraPosition;
+    glm::vec2 screenDimensions;
+    float deltaTime;
 };
 
 }

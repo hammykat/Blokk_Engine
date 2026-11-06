@@ -1,12 +1,13 @@
 #pragma once
 
+#include <SDL3/SDL.h>
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
-#include <vector>
-#include <string>
+#include <glm/glm.hpp>
 #include <memory>
-#include <algorithm>
-#include <SDL3/SDL.h>
+#include <string>
+#include <vector>
 
 // BFCL
 #include <concurrent_unordered_queue.hpp>
@@ -27,12 +28,16 @@ struct SDL_Texture;
 
 namespace Blokk
 {
+    // Camera is a basic structure with only position
+    // TODO: Add camera rotation (and zoom functionality IF POSSIBLE)
+    struct CameraController {
+        glm::vec2 position;
+    };
 
     class EngineCore;
     class GameObject;
     class Renderer;
     class Diagnostics;
-
 
     using UpdatePositionsFnPtr =
         void(EngineCore::*)(
@@ -63,11 +68,6 @@ namespace Blokk
     {
         Axis,
         Basic
-    };
-
-    struct EngineDiagnostics
-    {
-        uint32_t TotalThreadCount, OpenedThreadCount;
     };
 
     struct ManagerCreation
@@ -127,16 +127,13 @@ namespace Blokk
             #endif
 
             // Camera
-            #ifdef Blokk_CamEnabled
-                Camera(),
-            #endif
+            Camera(),
 
             // SIMD
             SIMDRegisterLevel(DetectSIMD()),
 
             // Screen
-            ScreenWidth(Cr.ScreenDimensions.x),
-            ScreenHeight(Cr.ScreenDimensions.y),
+            ScreenDimensions(static_cast<glm::vec2>(Cr.ScreenDimensions)),
 
             // Counts
             ObjectCount(0),
@@ -188,9 +185,7 @@ namespace Blokk
         void EngineProcess();
 
         // Camera
-        #ifdef Blokk_CamEnabled
-            CameraController Camera;
-        #endif
+        CameraController Camera;
 
         // Functions the user can call if manual threading enabled
         #ifdef Blokk_Threading_Manual
@@ -209,6 +204,7 @@ namespace Blokk
             AdaptiveThreadingEnabled = true;
         }
 
+        // Set the target execution time for engine to do adaptive threading
         void SetTargetExecutionTime(double Time)
         {
             // Make sure time isn't negative
@@ -240,15 +236,14 @@ namespace Blokk
     private:
 
         SIMDLevel SIMDRegisterLevel;
-        uint32_t ScreenHeight;
-        uint32_t ScreenWidth;
+        glm::vec2 ScreenDimensions;
 
         // Animations
         #ifdef Blokk_Rendering_Enabled
 
-        std::vector<uint8_t> IsVisible;
-        std::vector<uint32_t> FrameNums;
-        std::vector<uint32_t> AnimNums;
+        std::vector<uint8_t> IsVisible; // If the object is set to visible (By the user) 
+        std::vector<uint32_t> FrameNums; // The frame numbers of each object
+        std::vector<uint32_t> AnimNums; // The animation numbers of each object (Stored as indexes to animation array)
 
         // Stores the animation names, points to an index in the animations
         std::unordered_map<std::string, uint32_t> AnimNames;
@@ -261,9 +256,10 @@ namespace Blokk
 		std::vector<std::vector<float>> FrameWidths; 
         std::vector<std::vector<float>> FrameHeights;
 
-        std::vector<uint32_t> AnimFrameCounts; // Contains the number of frames for each animation
+        // Contains the number of frames for each animation
+        std::vector<uint32_t> AnimFrameCounts; 
 
-        // Visibility
+        // Contains the dimensions for each animation
         std::vector<float> AnimHeights;
         std::vector<float> AnimWidths;
 
@@ -273,7 +269,7 @@ namespace Blokk
         std::vector<GameObject*> ObjectInstances;
 
         // Rendering
-        std::vector<uint32_t> RenderObjectIdxs;
+        std::vector<uint32_t> RenderObjectIdxs; // Indexes to objects that need to get rendered
 
         // Frmae timings -----------------------------
         struct Timings
@@ -363,6 +359,12 @@ namespace Blokk
             #endif
 
         #endif
+
+        // Object data
+        std::vector<glm::vec2> Velocities; // The velocities of each object
+        std::vector<glm::vec2> Positions; // The positions of each object
+        std::vector<uint32_t> FrameNumbers; // The frame numbers of each object
+        std::vector<uint32_t> AnimationNumbers; // The animation numbers of each object (Stored as indexes to animation array)
 
         // Counts
         uint32_t ObjectCount;

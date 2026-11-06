@@ -3,98 +3,7 @@
 #include <SDL3/SDL.h>
 #include <SDL3_image/SDL_image.h>
 
-
-namespace Blokk
-{
-
-#ifdef Blokk_Rendering_Enabled
-
-enum class InitFlags : uint32_t
-{
-    None    = 0,
-    Audio   = SDL_INIT_AUDIO,
-    Video   = SDL_INIT_VIDEO,
-    Joystick = SDL_INIT_JOYSTICK,
-    Haptic  = SDL_INIT_HAPTIC,
-    Gamepad = SDL_INIT_GAMEPAD,
-    Events  = SDL_INIT_EVENTS,
-    Sensor  = SDL_INIT_SENSOR
-};
-
-constexpr InitFlags operator|(
-    InitFlags A,
-    InitFlags B
-)
-{
-    return static_cast<InitFlags>(
-        static_cast<uint32_t>(A) |
-        static_cast<uint32_t>(B)
-    );
-}
-
-void Init(InitFlags Flags)
-{
-    if (!SDL_Init(static_cast<SDL_InitFlags>(Flags)))
-    {
-        throw std::runtime_error(
-            std::string("Failed to initialize SDL: ") +
-            SDL_GetError()
-        );
-    }
-}
-
-enum class WindowFlags : uint32_t
-{
-    None        = 0,
-    Fullscreen  = SDL_WINDOW_FULLSCREEN,
-    Resizable   = SDL_WINDOW_RESIZABLE,
-    Borderless  = SDL_WINDOW_BORDERLESS,
-    Hidden      = SDL_WINDOW_HIDDEN,
-    Maximized   = SDL_WINDOW_MAXIMIZED,
-    Minimized   = SDL_WINDOW_MINIMIZED,
-    HighDPI     = SDL_WINDOW_HIGH_PIXEL_DENSITY
-};
-
-constexpr WindowFlags operator|(
-    WindowFlags A,
-    WindowFlags B
-)
-{
-    return static_cast<WindowFlags>(
-        static_cast<uint32_t>(A) |
-        static_cast<uint32_t>(B)
-    );
-}
-
-void Quit()
-{
-    SDL_Quit();
-}
-
-SDL_Window* CreateWindow(
-    const std::string& Title,
-    int Width,
-    int Height,
-    WindowFlags Flags = WindowFlags::None
-)
-{
-    SDL_Window* Window = SDL_CreateWindow(
-        Title.c_str(),
-        Width,
-        Height,
-        static_cast<SDL_WindowFlags>(Flags)
-    );
-
-    if (!Window)
-    {
-        throw std::runtime_error(
-            std::string("Failed to create window: ") +
-            SDL_GetError()
-        );
-    }
-
-    return Window;
-}
+namespace Blokk {
 
 class Renderer
 {
@@ -127,6 +36,47 @@ public:
 
         SDL_DestroyRenderer(SDLRenderer);
         SDL_DestroyWindow(Window);
+    }
+
+    void init()
+    {
+        // 1. Define 4 points of a square (X, Y coordinates from -1.0 to 1.0)
+        float vertices[] = {
+            -0.5f,  0.5f,  // Top Left
+            -0.5f, -0.5f,  // Bottom Left
+             0.5f, -0.5f,  // Bottom Right
+             0.5f,  0.5f   // Top Right
+        };
+
+        // Indices connect the dots to make two triangles forming our quad
+        unsigned int indices[] = {
+            0, 1, 3, // First Triangle
+            1, 2, 3  // Second Triangle
+        };
+
+        // 2. Generate a Vertex Array Object (VAO) and Vertex Buffer Object (VBO)
+        // This is just a unique integer address ID that points to a slot in GPU memory
+        unsigned int VAO, VBO, EBO;
+        glGenVertexArrays(1, &VAO);
+        glGenBuffers(1, &VBO);
+        glGenBuffers(1, &EBO);
+
+        // 3. Bind and upload the data arrays directly across the PCIe bus into GPU memory
+        glBindVertexArray(VAO);
+
+        glBindBuffer(GL_ARRAY_BUFFER, VBO);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
+        // 4. Tell OpenGL how to read our data layout (2 floats per position item)
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+        glEnableVertexAttribArray(0);
+
+        // Unbind our structures cleanly so we don't accidentally overwrite them
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        glBindVertexArray(0);
     }
 
     void RenderObjects()
@@ -303,6 +253,5 @@ public:
     }
 };
 
-#endif // Blokk_Rendering_Enabled
 
-}
+} // namespace Blokk

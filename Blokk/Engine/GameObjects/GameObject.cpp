@@ -23,7 +23,6 @@ GameObject::GameObject(ObjectCreationParams CP)
 GameObject::GameObject(
     vector2<float> velocity,
     vector2<float> position,
-    GameObject* object,
     bool visible
 )
     :
@@ -35,7 +34,7 @@ GameObject::GameObject(
         visible,
         velocity,
         position,
-        object
+        this
     );
 }
 

@@ -28,7 +28,6 @@ public:
     bool IsStatic;
     bool IsVisible;
     bool IsAnimated;
-    bool IsCollidable;
 
     GameObject(
         ObjectCreationParams CP = {true, {0, 0}, {0, 0}}
@@ -37,7 +36,6 @@ public:
     GameObject(
         vector2<float> Velocity,
         vector2<float> Position,
-        GameObject* Object,
         bool Visible = true
     );
 

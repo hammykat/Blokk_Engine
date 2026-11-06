@@ -14,6 +14,8 @@ namespace Blokk {
         bool initialized_; // If attempted to initialize
 
     public:
+        friend class Renderer;
+
         Window(); // Initializes variables
         ~Window(); // Terminates GLFW, destroys window
         bool init(); // Initializes GLFW, creates window, handles states

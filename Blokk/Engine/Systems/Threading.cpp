@@ -7,9 +7,6 @@
 #include <stdexcept>
 
 
-// TODO: Fix certain brace syntax, verify project works by giving 
-// AI EngineClassData.hpp and other related files.
-
 namespace Blokk
 {
 

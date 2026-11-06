@@ -31,6 +31,11 @@ namespace Blokk {
             return false;
         }
 
+        // Set OpenGL version (4.3 core)
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+        glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+
         // Create the actual window
         window_ = glfwCreateWindow(800, 600, "Blokk Engine", NULL, NULL);
         if (!window_) { // If fails return an error and terminate
@@ -40,8 +45,24 @@ namespace Blokk {
             return false;
         }
 
-        // Graphics commands connect to THIS window
+        // Bind OpenGL context to window
         glfwMakeContextCurrent(window_);
+
+        // Load GLAD, give error and return if fails
+        if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
+            std::cerr << "Failed to initialize GLAD\n";
+            return false;
+        }
+
+        // Give OpenGL the window size, setup initial viewport size
+        int displayWidth = 0, displayHeight = 0;
+        glfwGetFramebufferSize(window_, &displayWidth, &displayHeight);
+        glViewport(0, 0, displayWidth, displayHeight);
+
+        // Register continuous resize callback
+        glfwSetFramebufferSizeCallback(window_, [](GLFWwindow* window, int width, int height) {
+            glViewport(0, 0, width, height);
+        });
 
         //-------------------------------------------------------------------
         initialized_ = true;
