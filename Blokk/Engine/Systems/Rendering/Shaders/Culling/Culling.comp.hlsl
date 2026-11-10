@@ -13,8 +13,7 @@ struct ConstantFrameData {
     float DeltaTime;
 };
 
-[[vk::push_constants]] 
-ConstantFrameData FrameData;
+[[vk::push_constant]] ConstantFrameData FrameData;
 
 StructuredBuffer<float2> Positions : register(t1, space0); // Object positions [Updated by: GPU & CPU]
 

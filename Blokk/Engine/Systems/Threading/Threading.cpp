@@ -3,9 +3,10 @@
 
 #include <algorithm>
 #include <chrono>
-#include <vector>
 #include <stdexcept>
+#include <vector>
 
+#include "Compute_Shaders/Rendering.hpp"
 
 namespace Blokk
 {
@@ -63,14 +64,13 @@ namespace Blokk
 
 #endif
 
-// Executes all the engine processes, returning the time it took to execute all of them
-double EngineCore::TimeEngineProcesses()
+double EngineCore::TimeCPUEngineProcesses()
 {
     // Get the total start time
     auto TotalStartTime = std::chrono::steady_clock::now();
 
     // EngineProcesses-----------------------------------------
-
+    
     { // Velocities
 
         #ifdef Blokk_Diagnostics
@@ -79,7 +79,7 @@ double EngineCore::TimeEngineProcesses()
 
         // Get ranges
         std::vector<IndexRange> VelRanges =
-            GetRanges(DynamicObjectCount, UsedThreads);
+            GetRanges(DynamicObjectCount, m_UsedThreads);
 
         // Set function
         Worker::CurrentJob = UpdateRangeOfPositions;
@@ -91,8 +91,6 @@ double EngineCore::TimeEngineProcesses()
             Workers[i]->SetRange(VelRanges[i]);
         }
 
-        #ifdef Blokk_Rendering_Enabled
-
         { // Animation Frame Incrementing 
             // (Done while velocities are being done by other threads)
 
@@ -101,7 +99,7 @@ double EngineCore::TimeEngineProcesses()
             #endif
 
             // Let the main thread increment
-            IncrementFrames(FrameNums);
+            (this->*IncrementFrames)(m_FrameNumbers, CPUObjectCount.Total);
 
             #ifdef Blokk_Diagnostics
                 auto EndTime = std::chrono::steady_clock::now();
@@ -112,8 +110,6 @@ double EngineCore::TimeEngineProcesses()
                     ).count();
             #endif
         }
-
-        #endif
 
         // Wait for each to finish
         for (uint32_t i = 0; i < Count; i++)
@@ -131,8 +127,6 @@ double EngineCore::TimeEngineProcesses()
         #endif
     }
 
-#ifdef Blokk_Rendering_Enabled
-
     { // Animations
 
         { // Render
@@ -143,7 +137,7 @@ double EngineCore::TimeEngineProcesses()
 
             // Get ranges
             std::vector<IndexRange> VisRanges =
-                GetRanges(ObjectCount, UsedThreads);
+                GetRanges(ObjectCount, m_UsedThreads);
 
             // Set function
             Worker::CurrentJob = CheckVisibleRange;
@@ -185,11 +179,8 @@ double EngineCore::TimeEngineProcesses()
         }
     }
 
-#endif
-
-#ifdef Blokk_GameObjects_UpdateFunctions
+    // Update objects
     UpdateObjects();
-#endif
 
     // Get the end time
     auto TotalEndTime = std::chrono::steady_clock::now();
@@ -201,6 +192,32 @@ double EngineCore::TimeEngineProcesses()
         ).count();
 
     return TotalTime;
+    
+}
+
+double EngineCore::TimeGPUEngineProcesses()
+{
+    if (m_Renderer != nullptr) {
+        m_Renderer->RenderObjects();
+    }
+
+    // Nothing happened
+    return 0.0f;
+}
+
+// Executes all the engine processes, returning the time it took to execute all of them
+double EngineCore::TimeEngineProcesses()
+{
+    double totalTime = 0;
+    if (CPUObjectCount.Total != 0) {
+        totalTime += TimeCPUEngineProcesses();
+    }
+
+    if (GPUObjectCount.Total != 0) {
+        totalTime += TimeGPUEngineProcesses();
+    }
+
+    return totalTime;
 }
 
 #ifdef Blokk_Threading_AdaptiveTiming
@@ -324,7 +341,6 @@ void EngineCore::SetThreadCount(uint32_t Count)
 
 #endif
 
-#ifdef Blokk_GameObjects_UpdateFunctions
 
 void EngineCore::UpdateObjects()
 {
@@ -520,31 +536,29 @@ void EngineCore::ResetUpdateTimes() {
     std::fill(AverageUpdateTimes.begin(), AverageUpdateTimes.end(), 0);
 }
 
-#endif // Blokk_GameObjects_UpdateFunctions
 
 // TODO: Make loading function smoother, currently can stutter
 // Loads the engine. It adapts to the load, allowing other
-void EngineCore::LoadEngine(uint32_t Threading_NumberOfTests)
+void EngineCore::LoadEngine(uint32_t Threading_NumberOfTests, Renderer& p_Renderer)
 {
-    NumberOfTrials++;
+    m_NumberOfTrials++;
     nanoseconds totalTime{ 0 };
 
 // Load all the animations ------------------------
-#ifdef Blokk_Rendering_Enabled
 
-    if (CurrentLoadingStage == LoadingStage::LoadingAnimations) 
+    if (m_CurrentLoadingStage == LoadingStage::LoadingAnimations) 
     {
         // Loop through animations
-	    for (uint32_t i = currentProcessingIdx, count = AnimPaths.size(); i < count; i++)
+	    for (uint32_t i = m_CurrentProcessingIdx, count = m_AnimationPaths.size(); i < count; i++)
 	    {
             // Update processing index
-            currentProcessingIdx = i + 1;
+            m_CurrentProcessingIdx = i + 1;
 
             // Start time
             auto start = std::chrono::steady_clock::now();
 
             // Load animation
-            LoadAnimation(i);
+            p_Renderer.LoadTextures(m_AnimationPaths[i], m_AnimationNames[i]);
 
             // End time
             auto end = std::chrono::steady_clock::now();
@@ -554,28 +568,26 @@ void EngineCore::LoadEngine(uint32_t Threading_NumberOfTests)
             totalTime += time;
 
             // If taken up the time for the frame
-            if (totalTime >= FrameTime) {
+            if (totalTime >= m_FrameTime) {
                 return; // Leave
             }
-
 	    }
 
         // Change loading stage
-        CurrentLoadingStage = LoadingStage::TimingUpdateFunctions;
+        m_CurrentLoadingStage = LoadingStage::TimingUpdateFunctions;
     }
-
-
-#endif // Blokk_Rendering_Enabled
-
-#ifdef Blokk_GameObjects_UpdateFunctions
     
     // Time all the gameObjects update functions ------
-    if (CurrentLoadingStage == LoadingStage::TimingUpdateFunctions) 
+    if (m_CurrentLoadingStage == LoadingStage::TimingUpdateFunctions) 
     {
         ResetUpdateTimes(); // Set all to 0
+        if(CPUObjectCount.Total == 0) {
+            m_CurrentLoadingStage = LoadingStage::AdaptiveThreading;
+            return;
+        }
     
 	    Worker::CurrentJob = TimeUpdateRangeOfObjects;
-	    std::vector<IndexRange> Ranges = GetRanges(ObjectCount, UsedThreads);
+	    std::vector<IndexRange> Ranges = GetRanges(ObjectCount, m_UsedThreads);
 
         // Set each worker's assigned ranges
         uint32_t count = Ranges.size();
@@ -592,20 +604,25 @@ void EngineCore::LoadEngine(uint32_t Threading_NumberOfTests)
         GetAverageUpdateTimes();
 
         // Change stage
-        CurrentLoadingStage = LoadingStage::FilterUpdateFunctions;
+        m_CurrentLoadingStage = LoadingStage::FilterUpdateFunctions;
 
         // Return if time exceeded
-        if (totalTime > FrameTime.nano) {
+        if (totalTime > m_FrameTime.nano) {
             return;
         }
     }
 
-    if (CurrentLoadingStage == LoadingStage::FilterUpdateFunctions)
+    if (m_CurrentLoadingStage == LoadingStage::FilterUpdateFunctions)
     {
-        if (TotalUpdateTime > FrameTime.nano) 
+        // If no objects need to be updated
+        if (CPUObjectCount.Total == 0) {
+            break; // TODO: I don't think break can go here, add proper thing
+        }
+
+        if (m_TotalUpdateTime > m_FrameTime.nano) 
         {
             // Get the amount of time needed to cut off
-            auto timeExceeded = FrameTime.nano - TotalUpdateTime;
+            auto timeExceeded = m_FrameTime.nano - m_TotalUpdateTime;
             auto timeExceededRemaining = timeExceeded;
 
 
@@ -617,7 +634,7 @@ void EngineCore::LoadEngine(uint32_t Threading_NumberOfTests)
                 // Lowest and highest priority function levels
                 uint8_t LowestPriorityLevel = UINT8_MAX;
                 uint32_t HighestPriorityLevel = 0;
-                for (auto& level : UpdatePriorities) {
+                for (auto& level : m_UpdatePriorities) {
                     if (level < LowestPriorityLevel)
                         LowestPriorityLevel = level; // lowest priority
                     if (level > HighestPriorityLevel)
@@ -626,30 +643,30 @@ void EngineCore::LoadEngine(uint32_t Threading_NumberOfTests)
 
                 // Do not discard functions of the highest priority level
                 if (LowestPriorityLevel == HighestPriorityLevel) {
-                    CurrentLoadingStage = LoadingStage::AdaptiveThreading;
+                    m_CurrentLoadingStage = LoadingStage::AdaptiveThreading;
                     complete = true;
                     break;
                 }
 
                 // Get the functions that are the lowest priority level
-                uint32_t count = UpdatePriorities.size();
+                uint32_t count = m_UpdatePriorities.size();
                 std::vector<uint32_t> LowestPriorityFunctions;
                 for (uint32_t i = 0; i < count; i++) {
-                    if (UpdatePriorities[i] == LowestPriorityLevel)
+                    if (m_UpdatePriorities[i] == LowestPriorityLevel)
                         LowestPriorityFunctions.push_back(i);
                 }
 
                 for (auto& idx : LowestPriorityFunctions) 
                 {
                     // Update the time remainging to be exceeded
-                    timeExceededRemaining -= AverageUpdateTimes[idx];
+                    timeExceededRemaining -= m_AverageUpdateTimes[idx];
                     Remove_Function(idx); // Remove the function
 
                     // If the time exceeded has been fixed by removing the functions
                     if (timeExceededRemaining.count() <= 0) 
                     {
                         // Leave the loop
-                        CurrentLoadingStage = LoadingStage::AdaptiveThreading;
+                        m_CurrentLoadingStage = LoadingStage::AdaptiveThreading;
                         complete = true; 
                         break;
                     }
@@ -661,12 +678,10 @@ void EngineCore::LoadEngine(uint32_t Threading_NumberOfTests)
     // Allow user to update their loading screen
     return;
 
-#endif // Blokk_GameObject_UpdateFunctions
-
     // Adapt threading --------------------------------
 
+// If adaptive threading is enabled, adapt the number of threads used based on the time it took to load the engine
 #ifdef Blokk_Threading_AdaptiveTiming
-
     if (CurrentLoadingStage == LoadingStage::AdaptiveThreading) 
     {
         for (uint32_t i = 0; i < Threading_NumberOfTests; i++) {
@@ -677,51 +692,23 @@ void EngineCore::LoadEngine(uint32_t Threading_NumberOfTests)
         CurrentLoadingStage = LoadingStage::Complete;
         return;
     }
+#else 
+    // If adaptive threading is not enabled, just finish the loading process
+    if(m_CurrentLoadingStage == LoadingStage::AdaptiveThreading) {
+        m_CurrentLoadingStage = LoadingStage::Complete;
+        return;
+    }
 
 #endif // Blokk_Threading_AdaptiveTiming
 
 }
 
-#ifdef Blokk_GameObjects_UpdateFunctions
 
 inline void EngineCore::Remove_Function(uint32_t idx) {
     UpdateFunctionsSet[idx] = false;
     UpdatePriorities[idx] = UINT8_MAX;
     AverageUpdateTimes[idx] = nanoseconds_zero;
 }
-
-#endif
-
-#ifdef Blokk_Rendering_Enabled
-
-// Load all the frames of an animation using it's path
-void EngineCore::LoadAnimation(uint32_t idx) 
-{
-    uint32_t FrameCount = AnimPaths[idx].size();
-
-    // Resize the frames
-    Frames[idx].resize(FrameCount);
-    FrameWidths[idx].resize(FrameCount);
-    FrameHeights[idx].resize(FrameCount);
-
-    // Loop through each frame
-    for (uint32_t j = 0; j < FrameCount; j++)
-    {
-        // Load the texture
-        Frames[idx][j] = Renderer::LoadTexture(AnimPaths[idx][j]);
-
-        // Get the width and height
-        SDL_QueryTexture(
-            Frames[idx][j],
-            nullptr,
-            nullptr,
-            &FrameWidths[idx][j],
-            &FrameHeights[idx][j]
-        );
-    }
-}
-
-#endif // Blokk_Rendering_Enabled
 
 
 // #endif // ifdef Blokk_GameObjects_UpdateFunctions

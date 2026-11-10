@@ -1,8 +1,8 @@
 #pragma once
 
+#include <SDL3/SDL.h>
 #include <cstdint>
 #include <xsimd/xsimd.hpp>
-#include <SDL3/SDL.h>
 
 namespace Blokk
 {
@@ -13,7 +13,7 @@ void ProcessVelocities_SIMD(
     float* PosY,
     const float* VelX,
     const float* VelY,
-    const std::uint32_t Size,
+    const uint32_t Size,
     const double delta
 ) {
     using Batch = xsimd::batch<float, Arch>;

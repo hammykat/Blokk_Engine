@@ -58,8 +58,8 @@ void GameObject::SetToStatic()
     Engine->SwapDynamicObjects(EngineIdx, Engine->DynamicObjectCount - 1); // Swap with last dynamic
     Engine->SwapStaticObjects(EngineIdx, Engine->ObjectCount - 1); // Swap with last static
     // Remove velocity
-    Engine->XVelocities.pop_back(); 
-    Engine->YVelocities.pop_back(); 
+    Engine->m_XVelocities.pop_back(); 
+    Engine->m_YVelocities.pop_back(); 
 
     // Update engine vars
     Engine->StaticObjectCount++;
@@ -76,8 +76,8 @@ void GameObject::SetToDynamic(vector2<float> Vel)
     Engine->SwapStaticObjects(EngineIdx, Engine->DynamicObjectCount);
 
     // Add velocity to engine data
-    Engine->XVelocities.push_back(Vel.x);
-    Engine->YVelocities.push_back(Vel.y);
+    Engine->m_XVelocities.push_back(Vel.x);
+    Engine->m_YVelocities.push_back(Vel.y);
 
     // Update engine vars
     Engine->DynamicObjectCount++;

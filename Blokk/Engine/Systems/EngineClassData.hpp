@@ -12,7 +12,6 @@
 // BFCL
 #include <concurrent_unordered_queue.hpp>
 
-#include "Camera.hpp"
 
 // Forward-declare SDL types to avoid pulling the whole SDL header into this
 // widely-included header. Include the SDL headers in .cpp files where
@@ -39,13 +38,6 @@ namespace Blokk
     class Renderer;
     class Diagnostics;
 
-    using UpdatePositionsFnPtr =
-        void(EngineCore::*)(
-            float* PosX, float* PosY,
-            const float* VelX, const float* VelY,
-            uint32_t Size
-        );
-
     using TimeEngineProcessesFnPtr =
         double(EngineCore::*)();
 
@@ -61,8 +53,7 @@ namespace Blokk
 
 namespace Blokk
 {
-    using CheckVisibleRangeFnPtr =
-        void(EngineCore::*)(Worker& Thread);
+    
 
     enum Culling
     {
@@ -88,30 +79,30 @@ namespace Blokk
         EngineCore(ManagerCreation Cr) :
 
             // Threads
-            ThreadOpenedPrevFrame(false),
-            ThreadDestroyedPrevFrame(false),
-            AdaptiveThreadingEnabled(true),
-            ThreadCount(std::thread::hardware_concurrency()),
-            OpenedThreads(ThreadCount),
-            PrevOpenedThreads(0),
+            m_ThreadOpenedPrevFrame(false),
+            m_ThreadDestroyedPrevFrame(false),
+            m_AdaptiveThreadingEnabled(true),
+            m_ThreadCount(std::thread::hardware_concurrency()),
+            m_OpenedThreads(m_ThreadCount),
+            m_PrevOpenedThreads(0),
 
             // Frames
-            FPS(Cr.FPS),
-            FrameTime {
+            m_FPS(Cr.FPS),
+            m_FrameTime {
                 std::chrono::duration<double>{1.0 / Cr.FPS},
                 std::chrono::duration<double, std::milli>{1.0 / Cr.FPS},
                 std::chrono::duration<double, std::micro>{1.0 / Cr.FPS},
                 std::chrono::duration<double, std::nano>{1.0 / Cr.FPS}
             },
-            TargetExecutionTime {
-                FrameTime.secs * 0.8,
-                FrameTime.milli * 0.8,
-                FrameTime.micro * 0.8,
-                FrameTime.nano * 0.8
+            m_TargetExecutionTime {
+                m_FrameTime.secs * 0.8,
+                m_FrameTime.milli * 0.8,
+                m_FrameTime.micro * 0.8,
+                m_FrameTime.nano * 0.8
             },
 
-            FrameExecutionTime(0),
-            PrevFrameTime(0),
+            m_FrameExecutionTime(0),
+            m_PrevFrameTime(0),
 
             // Diagnostics timing
             #ifdef Blokk_Diagnostics
@@ -119,21 +110,17 @@ namespace Blokk
             VelocityTime(0),
             AnimationIncrementTime(0),
             VisibilityCullingTime(0),
-
-                #ifdef Blokk_Rendering_Enabled
-                    RenderTime(0),
-                #endif
-
+            RenderTime(0),
             #endif
 
             // Camera
             Camera(),
 
             // SIMD
-            SIMDRegisterLevel(DetectSIMD()),
+            m_SIMDRegisterLevel(DetectSIMD()),
 
             // Screen
-            ScreenDimensions(static_cast<glm::vec2>(Cr.ScreenDimensions)),
+            m_ScreenDimensions(static_cast<glm::vec2>(Cr.ScreenDimensions)),
 
             // Counts
             ObjectCount(0),
@@ -142,7 +129,7 @@ namespace Blokk
         {
 
             // Throw an error if no threads were found
-            if (ThreadCount == 0)
+            if (m_ThreadCount == 0)
             {
                 throw std::runtime_error(
                     "Blokk couldn't find the hardware thread count."
@@ -156,7 +143,7 @@ namespace Blokk
             Worker::Manager = this;
 
             // Open all threads
-            for(uint32_t i = 0; i < ThreadCount; i++)
+            for(uint32_t i = 0; i < m_ThreadCount; i++)
             {
                 OpenThread();
                 Workers[i]->setID(i);
@@ -166,18 +153,18 @@ namespace Blokk
             GetFunctions();
 
             // Get starting delta variable
-            CurrentExecutionStartTime = SDL_GetPerformanceCounter();
+            m_CurrentExecutionStartTime = SDL_GetPerformanceCounter();
         }
 
         ~EngineCore()
         {
             // Destroy all objects
             for (uint32_t i = 0; i < ObjectCount; i++) {
-                delete ObjectInstances[i];
+                delete m_ObjectInstances[i];
             }
 
             // Destroy all threads
-            for(uint32_t i = 0; i < OpenedThreads; i++) {
+            for(uint32_t i = 0; i < m_OpenedThreads; i++) {
                 DestroyThread();
             }
         }
@@ -223,7 +210,7 @@ namespace Blokk
         // Load a list of objects
         void LoadObjects(const std::vector<ObjectCreationParams>& ObjectData) {
             uint32_t count = ObjectData.size();
-            ObjectInstances.reserve(count);
+            m_ObjectInstances.reserve(count);
             for (uint32_t i = 0; i < count; i++) 
             {
                 // Create a new instance. Doesn't need any extra code here because object 
@@ -235,38 +222,41 @@ namespace Blokk
     // PRIVATE -------------------------------------------
     private:
 
-        SIMDLevel SIMDRegisterLevel;
-        glm::vec2 ScreenDimensions;
+        SIMDLevel m_SIMDRegisterLevel;
+        glm::vec2 m_ScreenDimensions;
+
+        // Object data --------------------------------------
+
+        std::vector<float> m_XVelocities;
+        std::vector<float> m_YVelocities;
+        std::vector<float> m_XPositions;
+        std::vector<float> m_YPositions;
 
         // Animations
-        #ifdef Blokk_Rendering_Enabled
-
-        std::vector<uint8_t> IsVisible; // If the object is set to visible (By the user) 
-        std::vector<uint32_t> FrameNums; // The frame numbers of each object
-        std::vector<uint32_t> AnimNums; // The animation numbers of each object (Stored as indexes to animation array)
+        std::vector<uint32_t> m_FrameNumbers;
+        std::vector<uint32_t> m_AnimationNumbers;
+        std::vector<uint8_t> m_IsVisible; // If the object is set to visible (By the user) 
 
         // Stores the animation names, points to an index in the animations
-        std::unordered_map<std::string, uint32_t> AnimNames;
+        std::unordered_map<std::string, uint32_t> m_AnimationNames;
 
         // Stores a list of animations
-		std::vector<std::vector<std::filesystem::path>> AnimPaths; // Contains the paths to the animation frames for each animation
-		std::vector<std::vector<SDL_Texture*>> Frames; // Contains the loaded SDL_Texture* for each animation frame
+		std::vector<std::vector<std::filesystem::path>> m_AnimationPaths; // Contains the paths to the animation frames for each animation
 
         // Contains the frame dimensions for each animation frame
-		std::vector<std::vector<float>> FrameWidths; 
-        std::vector<std::vector<float>> FrameHeights;
+		std::vector<std::vector<float>> m_FrameWidths; 
+        std::vector<std::vector<float>> m_FrameHeights;
 
         // Contains the number of frames for each animation
-        std::vector<uint32_t> AnimFrameCounts; 
+        std::vector<uint32_t> m_AnimationSizes; 
 
         // Contains the dimensions for each animation
-        std::vector<float> AnimHeights;
-        std::vector<float> AnimWidths;
+        std::vector<float> m_AnimationHeights;
+        std::vector<float> m_AnimationWidths;
 
-        #endif
-
+ 
         // Pointers to object instances
-        std::vector<GameObject*> ObjectInstances;
+        std::vector<GameObject*> m_ObjectInstances;
 
         // Rendering
         std::vector<uint32_t> RenderObjectIdxs; // Indexes to objects that need to get rendered
@@ -279,42 +269,40 @@ namespace Blokk
             std::chrono::duration<double, std::micro> micro{ 0 };
             std::chrono::duration<double, std::nano> nano = nanoseconds_zero;
         };
-        Timings FrameTime;
-        Timings TargetExecutionTime;
-        uint32_t FPS;
+        Timings m_FrameTime;
+        Timings m_TargetExecutionTime;
+        uint32_t m_FPS;
         
         // Delta timing
-        Uint64 PreviousExecutionStartTime;
-        Uint64 CurrentExecutionStartTime;
-        Timings DeltaTime;
+        Uint64 m_PreviousExecutionStartTime;
+        Uint64 m_CurrentExecutionStartTime;
+        Timings m_DeltaTime;
 
         // Work stealing system (for gameObject update functions)
-        #ifdef Blokk_GameObjects_UpdateFunctions
 
-        uint32_t NumberOfTrials = 0;
-        uint32_t currentProcessingIdx = 0;
-        std::vector<nanoseconds> TotalUpdateTimes; // Represents the total update time for each function
-        std::vector<nanoseconds> AverageUpdateTimes; // Represents the average amount of time each functoin took to execute
-        bool ImprovedUpdateTime; // Represents if the update time from this frame is less than the previous
-        std::vector<uint8_t> UpdatePriorities; // Represents the game object update function priority levels
-        std::vector<uint8_t> UpdateFunctionsSet; // Represents if the update function has been set
-        nanoseconds TotalUpdateTime; // Total amount of time for all functions to update
-        nanoseconds AverageUpdateTime; // Average amount of time for all the functions to update
-        nanoseconds PrevAvgUpdateTime;
-        bool ImprovedUpdateTimes; // If the update times from this frame were better that previous frames (shorter)
+        uint32_t m_NumberOfTrials = 0;
+        uint32_t m_CurrentProcessingIdx = 0;
+        std::vector<nanoseconds> m_TotalUpdateTimes; // Represents the total update time for each function
+        std::vector<nanoseconds> m_AverageUpdateTimes; // Represents the average amount of time each functoin took to execute
+        bool m_ImprovedUpdateTime; // Represents if the update time from this frame is less than the previous
+        std::vector<uint8_t> m_UpdatePriorities; // Represents the game object update function priority levels
+        std::vector<uint8_t> m_UpdateFunctionsSet; // Represents if the update function has been set
+        nanoseconds m_TotalUpdateTime; // Total amount of time for all functions to update
+        nanoseconds m_AverageUpdateTime; // Average amount of time for all the functions to update
+        nanoseconds m_PrevAvgUpdateTime;
+        bool m_ImprovedUpdateTimes; // If the update times from this frame were better that previous frames (shorter)
 
-        uint8_t LowestUpdatePriorityLevel;
-        uint8_t HighestUpdatePriorityLevel;
-        std::vector<uint32_t> LowestUpdatePriorityFunctions;
+        uint8_t m_LowestUpdatePriorityLevel;
+        uint8_t m_HighestUpdatePriorityLevel;
+        std::vector<uint32_t> m_LowestUpdatePriorityFunctions;
 
         std::vector<concurrent_unordered_queue<IndexRange>> ThreadRanges; // Represents every thread's queue of ranges to complete
-        std::vector<IndexRange> FullRanges; // Represent the full ranges assigned to each thread at the start
-        std::atomic<uint32_t> ProcessingWorkerCount = 0; // Represents the number of workers currently processing
-        std::atomic<uint32_t> RangesCompleteCount; // Represents the number of workers that have their ranges complete OR the last range is being currently processed
-        std::atomic<bool> AllWorkComplete; // If all the ranges have been processed
-        std::atomic<bool> WorkCompleteBeingChecked;
+        std::vector<IndexRange> m_FullRanges; // Represent the full ranges assigned to each thread at the start
+        std::atomic<uint32_t> m_ProcessingWorkerCount = 0; // Represents the number of workers currently processing
+        std::atomic<uint32_t> m_RangesCompleteCount; // Represents the number of workers that have their ranges complete OR the last range is being currently processed
+        std::atomic<bool> m_AllWorkComplete; // If all the ranges have been processed
+        std::atomic<bool> m_WorkCompleteBeingChecked; // If a thread is checking whether all the work is complete (To avoid multiple threads checking at once)
 
-        #endif // Blokk_GameObjects_UpdateFunctions
 
 		enum class LoadingStage
 		{
@@ -326,62 +314,62 @@ namespace Blokk
 		};
 
         // Allow the user to create their own custom loading screen for their game! --------------------------------------
-		LoadingStage CurrentLoadingStage; // Current loading stage of the engine
-		float CurrentPercentage; // Current percentage of the current loading stage
-		uint32_t CurrentLoadingObjectIdx; // Current object index being processed for the current loading stage
-        uint32_t NumberOfTrials; 
+		LoadingStage m_CurrentLoadingStage; // Current loading stage of the engine
+		float m_CurrentPercentage; // Current percentage of the current loading stage
+		uint32_t m_CurrentLoadingObjectIdx; // Current object index being processed for the current loading stage
+        uint32_t m_NumberOfTrials; 
 
         // Workers
-		uint32_t ThreadCount; // Total number of threads available on the system
-		uint32_t OpenedThreads; // Total number of threads currently opened by the engine
-		uint32_t UsedThreads; // Total number of threads currently being used by the engine
-        uint32_t PrevOpenedThreads;
+		uint32_t m_ThreadCount; // Total number of threads available on the system
+		uint32_t m_OpenedThreads; // Total number of threads currently opened by the engine
+		uint32_t m_UsedThreads; // Total number of threads currently being used by the engine
+        uint32_t m_PrevOpenedThreads;
 
-        bool ThreadOpenedPrevFrame;
-        bool ThreadDestroyedPrevFrame;
-        bool AdaptiveThreadingEnabled;
+        bool m_ThreadOpenedPrevFrame;
+        bool m_ThreadDestroyedPrevFrame;
+        bool m_AdaptiveThreadingEnabled;
 
-        double FrameExecutionTime;
-        double PrevFrameTime;
-        double TargetExecutionTime;
+        double m_FrameExecutionTime;
+        double m_PrevFrameTime;
+        double m_TargetExecutionTime;
 
         std::vector<std::unique_ptr<Worker>> Workers;
-
+        
         #ifdef Blokk_Diagnostics
 
         double UserUpdateTime;
         double VelocityTime;
         double AnimationIncrementTime;
         double VisibilityCullingTime;
-
-            #ifdef Blokk_Rendering_Enabled
-                double RenderTime;
-            #endif
+        double RenderTime;
 
         #endif
+        
+        // For updating GPU object data after the start
+        Renderer* m_Renderer;
 
-        // Object data
-        std::vector<glm::vec2> Velocities; // The velocities of each object
-        std::vector<glm::vec2> Positions; // The positions of each object
-        std::vector<uint32_t> FrameNumbers; // The frame numbers of each object
-        std::vector<uint32_t> AnimationNumbers; // The animation numbers of each object (Stored as indexes to animation array)
+        // GPU object data (only taken at start)
+        std::vector<glm::vec2> m_StartingVelocities; // The velocities of each object
+        std::vector<glm::vec2> m_StartingPositions; // The positions of each object
+        std::vector<uint32_t> m_StartingFrameNumbers; // The frame numbers of each object
+        std::vector<uint32_t> StartingAnimationNumbers; // The animation numbers of each object (Stored as indexes to animation array)
+
+        // CPU object data 
+
+        struct Counts {
+            uint32_t Total, Static, Dynamic;
+        };
 
         // Counts
-        uint32_t ObjectCount;
-        uint32_t StaticObjectCount;
-        uint32_t DynamicObjectCount;
+        Counts GPUObjectCount; // Objects that are updated by GPU
+        Counts CPUObjectCount; // Objects that are updated by the CPU
 
         // Functions -------------------------------------------------
 
-        // Get the right function implementations according to the user's SIMD
-        void GetFunctions()
-        {
-            #if (Blokk_Visibility_CullType == 0)
-                CheckVisibleRange = CheckVisibilityFn_Basic;
-            #elif (Blokk_Visibility_CullType == 1)
-                CheckVisibleRange = CheckVisibilityFn_Axis;
-            #endif
+        void SetRenderer(Renderer& p_Renderer) {
+            m_Renderer = &p_Renderer;
         }
+
 
         // Split a number into x ranges
         std::vector<IndexRange> GetRanges(uint32_t Length, uint32_t Count)
@@ -427,6 +415,8 @@ namespace Blokk
 
         // Execute engine processes and time it
         double TimeEngineProcesses();
+        double TimeGPUEngineProcesses();
+        double TimeCPUEngineProcesses();
 
         // Swap 2 objects
         void SwapStaticObjects(uint32_t Obj1, uint32_t Obj2);
@@ -438,30 +428,23 @@ namespace Blokk
 
         // POSITIONS W/ VELS -----------------------------------------
 
-        void UpdateRangeOfPositions(Worker& worker);
+        template<typename Arch>
+        void UpdateRangeOfPositionsFn(Worker& worker, IndexRange& Range);
 
-        UpdatePositionsFnPtr UpdatePositions;
-
-        void UpdatePositionsFn(
-            float* PosX,
-            float* PosY,
-            const float* VelX,
-            const float* VelY,
-            uint32_t Size
-        );
+        using UpdateRangeOfPositionsFnPtr = void(EngineCore::*)(Worker& worker, IndexRange& Range);
+        UpdateRangeOfPositionsFnPtr UpdatePositions;
 
         // Visibility checks ------------------------------------------
 
-        #if (Blokk_Visibility_CullType == 0)
-
-            void CheckVisibilityFn_Basic(Worker& worker);
-
-        #elif (Blokk_Visibility_CullType == 1)
-
-            void CheckVisibilityFn_Axis(Worker& worker);
-
+        #if (Blokk_Visibility_CullType == 0) // Basic
+            template <typename Arch>
+            void CheckVisibilityFn_Basic(Worker& worker, IndexRange& Range);
+        #elif (Blokk_Visibility_CullType == 1) // Axis
+            template <typename Arch>
+            void CheckVisibilityFn_Axis(Worker& worker, IndexRange& Range);
         #endif
 
+        using CheckVisibleRangeFnPtr = void(EngineCore::*)(Worker& worker, IndexRange& Range);
         CheckVisibleRangeFnPtr CheckVisibleRange;
 
         // Adding objects ----------------------------------------------------
@@ -472,10 +455,10 @@ namespace Blokk
 
         // Frame increment --------------------------------------------
 
-        void IncrementFrames(
-            std::vector<uint32_t>& FrameNums,
-            uint32_t Size
-        );
+        template<typename Arch>
+        void IncrementFramesFn(std::vector<uint32_t>& FrameNums, uint32_t Size);
+        using IncrementFramesFnPtr = void(EngineCore::*)(std::vector<uint32_t>& FrameNums, uint32_t Size);
+        IncrementFramesFnPtr IncrementFrames;
 
         // GameObject update functions
         #ifdef Blokk_GameObject_UpdateFunctions

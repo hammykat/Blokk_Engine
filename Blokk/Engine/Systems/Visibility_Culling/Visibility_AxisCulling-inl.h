@@ -17,13 +17,9 @@ std::vector<std::uint32_t> CheckVisible_AxisY_SIMD(
     const std::uint32_t* AnimHeights,
     const float* PosY,
     std::uint32_t Size,
-    std::uint32_t StartIdx
-
-#ifdef Blokk_CamEnabled
-    , float CameraY
-#endif
-)
-{
+    std::uint32_t StartIdx, 
+    float CameraY
+) {
     using FloatBatch = xsimd::batch<float, Arch>;
     using UIntBatch = xsimd::batch<std::uint32_t, Arch>;
 

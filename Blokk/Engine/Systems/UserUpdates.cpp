@@ -1,10 +1,10 @@
 #include <utility>
 #include <vector>
 
-#include "types.hpp"
 #include "Cached/GameObject.hpp"
-#include "Uncached/GameObject.hpp"
 #include "EngineClassData.hpp"
+#include "Uncached/GameObject.hpp"
+#include "types.hpp"
 
 namespace Blokk {
 
@@ -14,12 +14,12 @@ void EngineCore::DestroyStaticObject(uint32_t ObjIdx)
     SwapStaticObjects(ObjIdx, ObjectCount - 1);
 
     // Remove the object
-    XPositions.pop_back();
-    YPositions.pop_back();
-    ObjectInstances.pop_back();
+    m_XPositions.pop_back();
+    m_YPositions.pop_back();
+    m_ObjectInstances.pop_back();
 
-    StaticObjectCount--;
-    ObjectCount--;
+    CPUObjectCount.Static--;
+    CPUObjectCount.Total--;
 }
 
 void EngineCore::DestroyDynamicObject(uint32_t ObjIdx)
@@ -34,14 +34,14 @@ void EngineCore::DestroyDynamicObject(uint32_t ObjIdx)
     }
 
     // Remove the object from the back
-    XPositions.pop_back();
-    YPositions.pop_back();
-    XVelocities.pop_back();
-    YVelocities.pop_back();
-    ObjectInstances.pop_back();
+    m_XPositions.pop_back();
+    m_YPositions.pop_back();
+    m_XVelocities.pop_back();
+    m_YVelocities.pop_back();
+    m_ObjectInstances.pop_back();
 
-    DynamicObjectCount--;
-    ObjectCount--;
+    CPUObjectCount.Dynamic--;
+    CPUObjectCount.Total--;
 }
 
 void EngineCore::ProcessAddCommand(bool Visible, vector2<float> Velocity, vector2<float> Position, GameObject* Object)
@@ -56,14 +56,14 @@ void EngineCore::ProcessAddCommand(bool Visible, vector2<float> Velocity, vector
     // If creating a static object
     if(XVel == 0 && YVel == 0)
     {
-        Object->EngineIdx = XPositions.size();
+        Object->EngineIdx = m_XPositions.size();
 
         // Add position
-        XPositions.push_back(Position.x);
-        YPositions.push_back(Position.y);
+        m_XPositions.push_back(Position.x);
+        m_YPositions.push_back(Position.y);
         
         // Add instance pointer
-        ObjectInstances.push_back(Object);
+        m_ObjectInstances.push_back(Object);
 
         #ifdef Blokk_Rendering_Enabled
         // Add visibility
@@ -75,11 +75,11 @@ void EngineCore::ProcessAddCommand(bool Visible, vector2<float> Velocity, vector
     else // If creating a dynamic object
     {
         // Add position
-        XPositions.push_back(Position.x);
-        YPositions.push_back(Position.y);
+        m_XPositions.push_back(Position.x);
+        m_YPositions.push_back(Position.y);
 
         // Add instance pointer
-        ObjectInstances.push_back(Object);
+        m_ObjectInstances.push_back(Object);
 
         #ifdef Blokk_Rendering_Enabled
         // Add visibility
@@ -97,8 +97,8 @@ void EngineCore::ProcessAddCommand(bool Visible, vector2<float> Velocity, vector
         }
 
         // Add velocity
-        XVelocities.push_back(XVel);
-        YVelocities.push_back(YVel);
+        m_XVelocities.push_back(XVel);
+        m_YVelocities.push_back(YVel);
 
         DynamicObjectCount++;
     }
@@ -113,11 +113,11 @@ void EngineCore::ProcessAddCommand(EngineObjectCreationParams Fields) {
 void EngineCore::SwapStaticObjects(uint32_t Obj1, uint32_t Obj2)
 {
     // Swap X and Y
-    std::swap(XPositions[Obj1], XPositions[Obj2]);
-    std::swap(YPositions[Obj1], YPositions[Obj2]);
+    std::swap(m_XPositions[Obj1], m_XPositions[Obj2]);
+    std::swap(m_YPositions[Obj1], m_YPositions[Obj2]);
 
     // Swap instance pointers
-    std::swap(ObjectInstances[Obj1], ObjectInstances[Obj2]);
+    std::swap(m_ObjectInstances[Obj1], m_ObjectInstances[Obj2]);
 
     #ifdef Blokk_Rendering_Enabled
     // Swap visibility
@@ -125,19 +125,19 @@ void EngineCore::SwapStaticObjects(uint32_t Obj1, uint32_t Obj2)
     #endif
 
     // Update object's internal vars
-    ObjectInstances[Obj1]->EngineIdx = Obj1;
-    ObjectInstances[Obj2]->EngineIdx = Obj2;
+    m_ObjectInstances[Obj1]->EngineIdx = Obj1;
+    m_ObjectInstances[Obj2]->EngineIdx = Obj2;
 }
 
 void EngineCore::SwapDynamicObjects(uint32_t Obj1, uint32_t Obj2)
 {
     // Swap X and Y
-    std::swap(XPositions[Obj1], XPositions[Obj2]);
-    std::swap(YPositions[Obj1], YPositions[Obj2]);
+    std::swap(m_XPositions[Obj1], m_XPositions[Obj2]);
+    std::swap(m_YPositions[Obj1], m_YPositions[Obj2]);
 
     // Swap velocities
-    std::swap(XVelocities[Obj1], XVelocities[Obj2]);
-    std::swap(YVelocities[Obj1], YVelocities[Obj2]);
+    std::swap(m_XVelocities[Obj1], m_XVelocities[Obj2]);
+    std::swap(m_YVelocities[Obj1], m_YVelocities[Obj2]);
 
     #ifdef Blokk_Rendering_Enabled
     // Swap visibility
@@ -145,11 +145,11 @@ void EngineCore::SwapDynamicObjects(uint32_t Obj1, uint32_t Obj2)
     #endif
 
     // Swap instance pointers
-    std::swap(ObjectInstances[Obj1], ObjectInstances[Obj2]);
+    std::swap(m_ObjectInstances[Obj1], m_ObjectInstances[Obj2]);
 
     // Update object's internal vars
-    ObjectInstances[Obj1]->EngineIdx = Obj1;
-    ObjectInstances[Obj2]->EngineIdx = Obj2;
+    m_ObjectInstances[Obj1]->EngineIdx = Obj1;
+    m_ObjectInstances[Obj2]->EngineIdx = Obj2;
 }
 
 }

@@ -11,7 +11,8 @@ namespace Blokk {
         m_Window(p_Window), 
         m_Engine(p_Engine) 
     {
-        m_GPU_UpdatingObjectCounts = {m_Engine.TotalObjects, m_Engine.DynamicObjectCount, m_Engine.StaticObjectCount};
+        auto counts = m_Engine.GPUObjectCounts;
+        m_GPU_UpdatingObjectCounts = {counts.Total, counts.Dynamic, counts.Static};
         init_vulkan(&p_Window);
     }
     
@@ -67,10 +68,10 @@ namespace Blokk {
             m_FrameNumbersBuffer = CreateAndMapBuffer(objectCount * sizeof(uint32_t), UsageFlags::STORAGE_BUFFER, MemoryUsage::GPU_ONLY);
 
             // Populate the starting buffers with data from the engine
-            SendDataToBuffer<glm::vec2>(StartingVelocities, m_Engine.Velocities);
-            SendDataToBuffer<glm::vec2>(StartingPositions, m_Engine.Positions);
-            SendDataToBuffer<uint32_t>(StartingFrameNumbers, m_Engine.FrameNumbers);
-            
+            SendDataToBuffer<glm::vec2>(StartingVelocities, m_Engine.StartingVelocities);
+            SendDataToBuffer<glm::vec2>(StartingPositions, m_Engine.StartingPositions);
+            SendDataToBuffer<uint32_t>(StartingFrameNumbers, m_Engine.StartingFrameNumbers);
+            SendDataToBuffer<uint32_t>(m_AnimationNumbersBuffer, m_Engine.StartingAnimationNumbers);
 
             // Begin the command buffer
             BeginCommandBuffer();

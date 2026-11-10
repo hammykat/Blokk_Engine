@@ -146,10 +146,6 @@ namespace Blokk
         };
     }
 
-    inline void Renderer::EndCommandBuffer() {
-        vkEndCommandBuffer(m_CommandBuffer);
-    }
-
     template<typename T>
     void Renderer::SendDataToBuffer(VAllocatedBuffer buffer, const std::vector<T>& data) {
         AssertWhenDebug(buffer.mappedData != nullptr, "Buffer is not mapped in Renderer::SendDataToBuffer!");
@@ -189,7 +185,7 @@ namespace Blokk
         );
 
         ConstantFrameData frameData{
-            .deltaTime = m_Engine.DeltaTime.secs,
+            .deltaTime = m_Engine.m_DeltaTime.secs,
             .screenDimensions = m_Window.GetDimensions(),
             .cameraPosition = m_Engine.Camera.position,
             .objectCounts = m_GPU_UpdatingObjectCounts
@@ -266,11 +262,11 @@ namespace Blokk
 
 
 
-    inline void Renderer::EndCommandBuffer() {
+    inline void Renderer::EndCommandBuffer() const {
         vkEndCommandBuffer(m_CommandBuffer);
     }
 
-    inline void Renderer::BeginCommandBuffer() {
+    inline void Renderer::BeginCommandBuffer() const {
         if (vkBeginCommandBuffer(m_CommandBuffer, &m_CommandBufferBeginInfo) != VK_SUCCESS) {
             throw std::runtime_error("Failed to begin command buffer recording!");
         }

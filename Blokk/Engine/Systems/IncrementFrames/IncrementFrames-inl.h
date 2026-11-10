@@ -9,8 +9,8 @@ namespace Blokk
 
 template <class Arch>
 void IncrementFramesImpl(
-    std::uint32_t* FrameNums,
-    std::uint32_t Size
+    uint32_t* FrameNumbers,
+    uint32_t Size
 )
 {
     using Batch = xsimd::batch<std::uint32_t, Arch>;
@@ -25,17 +25,17 @@ void IncrementFramesImpl(
          i += static_cast<std::uint32_t>(Lanes))
     {
         Batch FrameData =
-            xsimd::load_unaligned(FrameNums + i);
+            xsimd::load_unaligned(FrameNumbers + i);
 
         FrameData += One;
 
-        FrameData.store_unaligned(FrameNums + i);
+        FrameData.store_unaligned(FrameNumbers + i);
     }
 
     // Remaining elements
     for (; i < Size; ++i)
     {
-        ++FrameNums[i];
+        ++FrameNumbers[i];
     }
 }
 

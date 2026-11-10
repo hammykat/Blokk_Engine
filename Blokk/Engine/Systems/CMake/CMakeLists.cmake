@@ -18,8 +18,16 @@ target_include_directories(Blokk
         ${CMAKE_CURRENT_SOURCE_DIR}/../../../Include
         ${CMAKE_CURRENT_SOURCE_DIR}/../../GameObjects
         ${CMAKE_CURRENT_SOURCE_DIR}/../../Helpers
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../Systems
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../Systems/Visibility_Culling
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../Systems/Threading
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../Systems/Rendering
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../Systems/IncrementFrames
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../Systems/Velocities
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../Systems/Rendering
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../Systems/Rendering/Window
         ${CMAKE_CURRENT_SOURCE_DIR}/..
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../vendored/glm/glm
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../vendored/glm/glm
 )
 
 target_link_libraries(Blokk
