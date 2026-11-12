@@ -41,6 +41,10 @@ target_link_libraries(Blokk
         glm::glm
 )
 
+# Shader compiler
+include("${CMAKE_CURRENT_LIST_DIR}/Shaders.cmake")
+add_dependencies(Blokk CompileShaders)
+
 # SIMD DETECTOR -------------------------------------------------------------
 
 include(CheckCXXCompilerFlag)

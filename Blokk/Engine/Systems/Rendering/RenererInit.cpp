@@ -12,7 +12,7 @@ namespace Blokk {
         m_Engine(p_Engine) 
     {
         auto counts = m_Engine.GPUObjectCounts;
-        m_GPU_UpdatingObjectCounts = {counts.Total, counts.Dynamic, counts.Static};
+        m_GPU_ObjectCount = {counts.Total, counts.Dynamic, counts.Static};
         init_vulkan(&p_Window);
     }
     
@@ -43,9 +43,7 @@ namespace Blokk {
     }
 
     
-    void Renderer::CreateAndMapAllBuffers() {
-        uint32_t objectCount = m_Engine.ObjectCount; // Get the number of objects from the engine
-
+    void Renderer::CreateAndMapAllBuffers(uint32_t objectCount) {
         // Create and map buffers for compute shaders ----------------------------
         {
             // Buffer for indirect draw commands (VkDrawIndirectCommand) to be read by the GPU

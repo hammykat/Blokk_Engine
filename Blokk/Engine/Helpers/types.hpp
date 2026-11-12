@@ -184,4 +184,20 @@ struct ConstantFrameData {
     float deltaTime;
 };
 
+struct BulkObjectCreationData
+{
+    uint32_t ObjectCount = 0;
+    std::vector<glm::vec2> Positions{};
+    std::vector<glm::vec2> Velocities{};
+    std::vector<uint32_t> FrameNumbers{};
+    std::vector<uint32_t> AnimationNumbers{};
+};
+
+// TODO: make engine use
+struct GPUPipelineCreationData {
+    bool CalledByEngineEveryFrame = true;
+    uint32_t MaxObjects = 1000;
+    BulkObjectCreationData StartingData{};
+};
+
 }

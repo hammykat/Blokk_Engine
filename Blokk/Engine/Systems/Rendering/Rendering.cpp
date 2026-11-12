@@ -24,6 +24,7 @@
 
 namespace Blokk 
 {
+
     void Renderer::DrawFrame()
     {
         // 1. Wait for the previous frame using this slot to finish executing on the GPU
@@ -146,12 +147,6 @@ namespace Blokk
         };
     }
 
-    template<typename T>
-    void Renderer::SendDataToBuffer(VAllocatedBuffer buffer, const std::vector<T>& data) {
-        AssertWhenDebug(buffer.mappedData != nullptr, "Buffer is not mapped in Renderer::SendDataToBuffer!");
-        std::memcpy(buffer.mappedData, data.data(), data.size() * sizeof(T));
-    }
-
     void Renderer::RunComputeShaders()
     {
         BeginCommandBuffer();
@@ -188,7 +183,7 @@ namespace Blokk
             .deltaTime = m_Engine.m_DeltaTime.secs,
             .screenDimensions = m_Window.GetDimensions(),
             .cameraPosition = m_Engine.Camera.position,
-            .objectCounts = m_GPU_UpdatingObjectCounts
+            .objectCounts = m_GPU_ObjectCount
         };
 
         vkCmdPushConstants(

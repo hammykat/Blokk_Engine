@@ -219,6 +219,12 @@ namespace Blokk
             }
         }
 
+        // GPU pipeline functions --------------------------------------
+
+        void InitializeGPUPipeline(BulkObjectCreationData& Data);
+        void BulkCreateGPUObjects(BulkObjectCreationData& Data);
+        void BulkDestroyGPUObjects(const std::vector<uint32_t>& IndexesToDelete);
+
     // PRIVATE -------------------------------------------
     private:
 
@@ -254,7 +260,6 @@ namespace Blokk
         std::vector<float> m_AnimationHeights;
         std::vector<float> m_AnimationWidths;
 
- 
         // Pointers to object instances
         std::vector<GameObject*> m_ObjectInstances;
 
@@ -347,6 +352,7 @@ namespace Blokk
         
         // For updating GPU object data after the start
         Renderer* m_Renderer;
+        bool m_GPUPipelineInitialized;
 
         // GPU object data (only taken at start)
         std::vector<glm::vec2> m_StartingVelocities; // The velocities of each object

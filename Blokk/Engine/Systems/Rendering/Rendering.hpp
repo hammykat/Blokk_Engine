@@ -77,8 +77,7 @@ namespace Blokk {
 		Window& m_Window;
 		EngineCore& m_Engine;
 
-		uint32_t m_GPU_UpdatingObjectCounts[3]; 
-		uint32_t m_ObjectCount = 0;
+		uint32_t m_GPU_ObjectCount; // Number of objects being updated by the GPU
 		uint32_t m_AnimationCount = 0;
 
 		GLuint m_TexturePoolHandles[TextureSizeCount];
@@ -92,6 +91,7 @@ namespace Blokk {
 		std::vector<VkFence> m_InFlightFences;
 		uint32_t m_CurrentFrame = 0;
 
+		// Basics
 		VkInstance m_Instance;
 		VkDebugUtilsMessengerEXT m_DebugMessager;
 		VkSurfaceKHR m_Surface;
@@ -99,14 +99,17 @@ namespace Blokk {
 		VkDevice m_Device;
 		vkb::Device m_VkbDevice;
 
+		// Queues
 		VkQueue m_GraphicsQueue;
 		uint32_t m_GraphicsQueueIndex; 
 		VkQueue m_PresentQueue;
 
+		// Commands
 		VkCommandPool m_CommandPool;
 		VkCommandBuffer m_CommandBuffer;
 		VkCommandBufferBeginInfo m_CommandBufferBeginInfo;
 
+		// Swapchain & presentation
 		VkSwapchainKHR m_Swapchain;
 		VkFormat m_SwapchainImageFormat;
 		VkExtent2D swapchain_extent;
@@ -121,6 +124,7 @@ namespace Blokk {
 		
 		VmaAllocator m_Allocator;
 
+		// Buffers
 		AllocatedBuffer m_VelocitiesBuffer;
 		AllocatedBuffer m_PositionsBuffer;
 		AllocatedBuffer m_AnimationNumbersBuffer;
@@ -147,7 +151,7 @@ namespace Blokk {
 		VkShaderModule CreateShaderModule(VkDevice device, const std::vector<uint32_t>& code);
 
 		AllocatedBuffer CreateAndMapBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
-		void CreateAndMapAllBuffers();
+		void CreateAndMapAllBuffers(uint32_t objectCount);
 		void SubmitCommandBuffersAndWait(int32_t cmdBufferCount);
 
 		void CreateBindlessDescriptorLayout();
@@ -155,6 +159,20 @@ namespace Blokk {
 		inline void BeginCommandBuffer();
 		inline void EndCommandBuffer();
 		[[nodiscard]] inline VkBufferCopy CreateBufferCopyRegion(uint32_t srcOffset, uint32_t dstOffset, VkDeviceSize size);
+		template<typename T>
+		void SendDataToCPUBuffer(AllocatedBuffer buffer, const std::vector<T>& data) {
+			AssertWhenDebug(buffer.mappedData != nullptr, "Buffer is not mapped in Renderer::SendDataToBuffer!");
+			std::memcpy(buffer.mappedData, data.data(), data.size() * sizeof(T));
+		}
+		template<typename T>
+		void SendDataToCPUBuffer(AllocatedBuffer buffer, const std::span<T>& data) {
+			AssertWhenDebug(buffer.mappedData != nullptr, "Buffer is not mapped in Renderer::SendDataToBuffer!");
+			std::memcpy(buffer.mappedData, data.data(), data.size() * sizeof(T));
+		}
+		template<typename T>
+		void SendDataToGPUBuffer(const std::vector<T>& data, AllocatedBuffer buffer, uint32_t offset);
+		void BulkAddDataToGPUBuffers(const BulkObjectCreationData& Data);
+		void BulkDeleteObjects(std::vector<uint32_t>& Indexes);
 
 		std::vector<uint32_t> LoadShaderFile(const std::string& _filePath);
 		void LoadAndStoreShaders();
@@ -187,10 +205,6 @@ namespace Blokk {
 		void RunComputeShaders();
 		inline void DestroyBuffer(AllocatedBuffer buffer);
 
-		template<typename T>
-		void SendDataToBuffer(AllocatedBuffer buffer, const std::vector<T>& data) {
-			std::memcpy(buffer.mappedData, data.data(), data.size() * sizeof(T));
-		}
 
 	public:
 		friend class EngineCore;
@@ -200,7 +214,6 @@ namespace Blokk {
 
 		void DrawFrame();
 		void LoadAnimation(const std::vector<std::filesystem::path>& paths, const std::string& name);
-		[[nodiscard]] std::span<const GLuint> GetFramesForAnimation(const std::string& name);
 
 		void SetWindow(Window& Window);
 

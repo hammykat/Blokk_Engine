@@ -31,9 +31,6 @@ void main(uint3 _id : SV_DispatchThreadID) {
     // Update a frame number
     FrameNumbers[id] = (FrameNumbers[id] + 1) % AnimationSizes[id];
 
-    // Don't update static objects
-    if(id >= FrameData.ObjectCounts.Dynamic) return;
-
     // Update a position
     Positions[id] += Velocities[id] * FrameData.DeltaTime;
 }
