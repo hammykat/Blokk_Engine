@@ -8,6 +8,7 @@ project(Blokk
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Disable Perl requiring AVIF support
 set(SDLIMAGE_AVIF OFF CACHE BOOL "Disable AVIF support" FORCE)
@@ -66,4 +67,4 @@ add_subdirectory(vendored/xsimd EXCLUDE_FROM_ALL)
 add_subdirectory(vendored/BFCL)
 
 # Blokk engine
-add_subdirectory(Blokk/Engine/Systems)
+add_subdirectory(Blokk/Engine/Systems/CMake)

@@ -1,6 +1,7 @@
 #include "EngineClassData.hpp"
 #include "Rendering/Rendering.hpp"
 
+#include <cmath>
 #include <functional>
 #include <span>
 
@@ -41,10 +42,13 @@ namespace Blokk {
         SendDataToGPUBuffer<uint32_t>(Data.FrameNumbers, m_FrameNumbersBuffer, m_GPU_ObjectCount);
         SendDataToGPUBuffer<uint32_t>(Data.AnimationNumbers, m_AnimationNumbersBuffer, m_GPU_ObjectCount);
 
+        // Add a barrier to prevent memory bugs
+        CmdTransferToComputeBarrier();
+
         EndCommandBuffer(); 
         SubmitCommandBuffersAndWait(1); // Submit the command buffer and wait for completion
 
-        m_GPU_ObjectCount = Data.ObjectCount; // Total
+        m_GPU_ObjectCount += Data.ObjectCount; // Total
     }
 
     void Renderer::BulkDeleteObjects(std::vector<uint32_t>& Indexes) 
@@ -60,8 +64,8 @@ namespace Blokk {
         uint32_t StartingSwapIndexInArray = 0; 
 
         auto splitIndex = std::upper_bound(
-            sortedIndexes.begin(), 
-            sortedIndexes.end(), 
+            Indexes.begin(), 
+            Indexes.end(), 
             StartingSwapIndex, 
             std::greater<uint32_t>()
         );
@@ -69,11 +73,57 @@ namespace Blokk {
         std::span<uint32_t> firstGroup(Indexes.begin(), splitIndex);
         std::span<uint32_t> secondGroup(splitIndex, Indexes.end());
 
+        // First pass -----------------------------------------
+
+        // Send data to staging buffer
+        SendDataToCPUBuffer<uint32_t>(m_DeletionStagingBuffer, firstGroup);
         BeginCommandBuffer();
 
-        // TODO: Create and map and add an indexes to delete GPU buffer along with it's size
-        // TODO: Make suer it's passing the right params here...
-        SendDataToGPUBuffer(firstGroup, m_VisibleIndicesBuffer)
+        // Send the data to the GPU buffer to be used
+        auto region = CreateBufferCopyRegion(0, 0, firstGroup.size() * sizeof(uint32_t));
+        auto countRegion = CreateBufferCopyRegion(0, 0, sizeof(uint32_t));
+        vkCmdCopyBuffer(m_CommandBuffer, m_DeletionStagingBuffer, m_IndexesToDeleteBuffer, 1, &region);
+        vkCmdCopyBuffer(m_CommandBuffer, m_DeletionStagingBuffer, m_IndexesToDeleteBuffer, 1, &region);
+        CmdTransferToComputeBarrier(); // Add a barrier to prevent memory bugs
+
+        vkCmdBindPipeline(m_CommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_ObjectDeletionPipeline);
+        vkCmdBindDescriptorSets(m_CommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_PipelineLayout, 0, 1, &m_DescriptorSet, 0, nullptr);
+
+        // Get the required number of groups according to the workgroup size (hardcoded to 256)
+        uint32_t NumberOfGroups = std::ceil(static_cast<float>(firstGroup.size()) / 256.0f);
+        vkCmdDispatch(m_CommandBuffer, NumberOfGroups, 1, 1);
+
+        // Wait for the first pass to finish
+        EndCommandBuffer();
+        SubmitCommandBuffersAndWait(1);
+
+        // Second pass -------------------------------------------
+        if(secondGroup.empty()) return;
+
+        // Send data to staging buffer
+        SendDataToCPUBuffer<uint32_t>(m_DeletionStagingBuffer, secondGroup);
+        BeginCommandBuffer();
+
+        // Send the data to the GPU buffer to be used
+        region = CreateBufferCopyRegion(0, 0, secondGroup.size() * sizeof(uint32_t));
+        vkCmdCopyBuffer(m_CommandBuffer, m_DeletionStagingBuffer, m_IndexesToDeleteBuffer, 1, &region);
+        CmdTransferToComputeBarrier(); // Add a barrier to prevent memory bugs
+
+        vkCmdBindPipeline(m_CommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_ObjectDeletionPipeline);
+        vkCmdBindDescriptorSets(m_CommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_PipelineLayout, 0, 1, &m_DescriptorSet, 0, nullptr);
+
+        // Get the required number of groups according to the workgroup size (hardcoded to 256)
+        uint32_t NumberOfGroups = std::ceil(static_cast<float>(secondGroup.size()) / 256.0f);
+        vkCmdDispatch(m_CommandBuffer, NumberOfGroups, 1, 1);
+
+        // Wait for the second pass to finish
+        EndCommandBuffer();
+        SubmitCommandBuffersAndWait(1);
+
+        //------------------------------------------------
+
+        // Update the object count
+        m_GPU_ObjectCount -= Indexes.size();
     }
 }
 

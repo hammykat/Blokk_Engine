@@ -2,8 +2,10 @@
 
 #include <GLFW/glfw3.h>
 #include <VkBootstrap.h>
+#include <vulkan/vulkan.h>
 
 #include "../EngineClassData.hpp"
+#include "types.hpp"
 
 namespace Blokk {
 
@@ -18,32 +20,40 @@ namespace Blokk {
     
     Renderer::~Renderer() {
         // Clean up
-        vkDestroyPipelineLayout(m_Device, m_PipelineLayout, nullptr);
-        vkDestroyDescriptorSetLayout(m_Device, m_DescriptorSetLayout, nullptr);
-        vkDestroySwapchainKHR(m_Device, m_Swapchain, nullptr);
-        vkDestroyDebugUtilsMessengerEXT(m_Instance, m_DebugMessager, nullptr);
-        vkDestroySurfaceKHR(m_Instance, m_Surface, nullptr);
-        vkDestroyPipeline(m_Device, m_VelocitiesPipeline, nullptr);
-        vkDestroyPipeline(m_Device, m_RenderCullingPipeline, nullptr);
-        vkDestroyDevice(m_Device, nullptr);
-        vkDestroyInstance(m_Instance, nullptr);
+        ::vkDestroyPipelineLayout(m_Device, m_PipelineLayout, nullptr);
+        ::vkDestroyDescriptorSetLayout(m_Device, m_DescriptorSetLayout, nullptr);
+        ::vkDestroySwapchainKHR(m_Device, m_Swapchain, nullptr);
+        ::vkDestroyDebugUtilsMessengerEXT(m_Instance, m_DebugMessager, nullptr);
+        ::vkDestroySurfaceKHR(m_Instance, m_Surface, nullptr);
+        ::vkDestroyPipeline(m_Device, m_VelocitiesPipeline, nullptr);
+        ::vkDestroyPipeline(m_Device, m_RenderCullingPipeline, nullptr);
+        ::vkDestroyDevice(m_Device, nullptr);
+        ::vkDestroyInstance(m_Instance, nullptr);
         
         // Command pool
         if (m_CommandPool != VK_NULL_HANDLE) {
-            vkDestroyCommandPool(m_Device, m_CommandPool, nullptr);
+            ::vkDestroyCommandPool(m_Device, m_CommandPool, nullptr);
             m_CommandPool = VK_NULL_HANDLE;
         }
 
         // Semaphores and fences
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            vkDestroySemaphore(m_Device, m_ImageAvailableSemaphores[i], nullptr);
-            vkDestroySemaphore(m_Device, m_RenderFinishedSemaphores[i], nullptr);
-            vkDestroyFence(m_Device, m_InFlightFences[i], nullptr);
+            ::vkDestroySemaphore(m_Device, m_ImageAvailableSemaphores[i], nullptr);
+            ::vkDestroySemaphore(m_Device, m_RenderFinishedSemaphores[i], nullptr);
+            ::vkDestroyFence(m_Device, m_InFlightFences[i], nullptr);
         }
     }
 
     
-    void Renderer::CreateAndMapAllBuffers(uint32_t objectCount) {
+    void Renderer::CreateAndMapAllBuffers(GPUPipelineCreationData& data) 
+    {
+        // Helpers 
+        uint32_t allocationSize = data.MaxObjects;
+        uint32_t vec2allocationSize = allocationSize * sizeof(glm::vec2);
+        uint32_t uintallocationSize = allocationSize * sizeof(uint32_t);
+
+        BeginCommandBuffer();
+
         // Create and map buffers for compute shaders ----------------------------
         {
             // Buffer for indirect draw commands (VkDrawIndirectCommand) to be read by the GPU
@@ -51,48 +61,61 @@ namespace Blokk {
                 UsageFlags::STORAGE_BUFFER | UsageFlags::INDIRECT_BUFFER | 
                 UsageFlags::TRANSFER_DST, MemoryUsage::GPU_ONLY);
 
-            m_ValidIndexesBuffer = CreateAndMapBuffer(objectCount * sizeof(uint32_t), UsageFlags::TRANSFER_SRC, MemoryUsage::GPU_ONLY);
-            vkCmdFillBuffer(m_CommandBuffer, m_ValidIndexesBuffer.buffer, 0, objectCount * sizeof(uint32_t), 0);
+            m_ValidIndexesBuffer = CreateAndMapBuffer(uintallocationSize, UsageFlags::TRANSFER_SRC, MemoryUsage::GPU_ONLY);
+            vkCmdFillBuffer(m_CommandBuffer, m_ValidIndexesBuffer.buffer, 0, uintallocationSize, 0);
+        }
 
-            // Buffers that are sent ONCE at the start to the GPU. These are used to initialize the GPU's buffers for the compute shaders
-            auto StartingVelocities = CreateAndMapBuffer(objectCount * sizeof(glm::vec2), UsageFlags::TRANSFER_SRC, MemoryUsage::CPU_TO_GPU);
-            auto StartingPositions = CreateAndMapBuffer(objectCount * sizeof(glm::vec2), UsageFlags::TRANSFER_SRC, MemoryUsage::CPU_TO_GPU);
-            auto StartingFrameNumbers = CreateAndMapBuffer(objectCount * sizeof(uint32_t), UsageFlags::TRANSFER_SRC, MemoryUsage::CPU_TO_GPU);
+        {
+            // Deletion buffers -----------------------------------------
+            uint32_t deletionAllocationSize = data.MaxObjectsDeletedAtOnce * sizeof(uint32_t);
+            m_DeletionStagingBuffer = CreateAndMapBuffer(deletionAllocationSize, UsageFlags::TRANSFER_SRC, MemoryUsage::CPU_TO_GPU);
+            m_IndexesToDeleteBuffer = CreateAndMapBuffer(deletionAllocationSize, UsageFlags::TRANSFER_DST, MemoryUsage::GPU_ONLY);
 
-            // Buffers that are used for the compute shaders to read/write to. These are persistent buffers that the compute shaders will use every frame
-            m_VelocitiesBuffer = CreateAndMapBuffer(objectCount * sizeof(glm::vec2), UsageFlags::STORAGE_BUFFER | UsageFlags::TRANSFER_DST, MemoryUsage::CPU_TO_GPU);
-            m_PositionsBuffer = CreateAndMapBuffer(objectCount * sizeof(glm::vec2), UsageFlags::STORAGE_BUFFER | UsageFlags::TRANSFER_DST, MemoryUsage::GPU_ONLY);
-            m_AnimationNumbersBuffer = CreateAndMapBuffer(objectCount * sizeof(uint32_t), UsageFlags::STORAGE_BUFFER, MemoryUsage::GPU_ONLY);
-            m_FrameNumbersBuffer = CreateAndMapBuffer(objectCount * sizeof(uint32_t), UsageFlags::STORAGE_BUFFER, MemoryUsage::GPU_ONLY);
+            // Fill with 0
+            std::memset(m_DeletionStagingBuffer.mappedData, 0, deletionAllocationSize); 
+            ::vkCmdFillBuffer(m_CommandBuffer, m_IndexesToDeleteBuffer, 0, deletionAllocationSize, 0);
+        }
 
-            // Populate the starting buffers with data from the engine
-            SendDataToBuffer<glm::vec2>(StartingVelocities, m_Engine.StartingVelocities);
-            SendDataToBuffer<glm::vec2>(StartingPositions, m_Engine.StartingPositions);
-            SendDataToBuffer<uint32_t>(StartingFrameNumbers, m_Engine.StartingFrameNumbers);
-            SendDataToBuffer<uint32_t>(m_AnimationNumbersBuffer, m_Engine.StartingAnimationNumbers);
+        // Buffers that are sent ONCE at the start to the GPU. 
+        // Declared here so they stay in scope for cleanup at the end of the function.
+        auto StartingVelocities = CreateAndMapBuffer(vec2allocationSize, UsageFlags::TRANSFER_SRC, MemoryUsage::CPU_TO_GPU);
+        auto StartingPositions = CreateAndMapBuffer(vec2allocationSize, UsageFlags::TRANSFER_SRC, MemoryUsage::CPU_TO_GPU);
+        auto StartingFrameNumbers = CreateAndMapBuffer(uintallocationSize, UsageFlags::TRANSFER_SRC, MemoryUsage::CPU_TO_GPU);
 
-            // Begin the command buffer
-            BeginCommandBuffer();
+        {
+            // Buffers that are used for the compute shaders to read/write to every frame
+            m_VelocitiesBuffer = CreateAndMapBuffer(vec2allocationSize, UsageFlags::STORAGE_BUFFER | UsageFlags::TRANSFER_DST, MemoryUsage::GPU_ONLY);
+            m_PositionsBuffer = CreateAndMapBuffer(vec2allocationSize, UsageFlags::STORAGE_BUFFER | UsageFlags::TRANSFER_DST, MemoryUsage::GPU_ONLY);
+            m_AnimationNumbersBuffer = CreateAndMapBuffer(uintallocationSize, UsageFlags::STORAGE_BUFFER, MemoryUsage::GPU_ONLY);
+            m_FrameNumbersBuffer = CreateAndMapBuffer(uintallocationSize, UsageFlags::STORAGE_BUFFER, MemoryUsage::GPU_ONLY);
+            
+            // FIXED: Vector is passed first, AllocatedBuffer is passed second
+            SendDataToGPUBuffer<glm::vec2>(m_Engine.StartingVelocities, StartingVelocities, 0);
+            SendDataToGPUBuffer<glm::vec2>(m_Engine.StartingPositions, StartingPositions, 0);
+            SendDataToGPUBuffer<uint32_t>(m_Engine.StartingFrameNumbers, StartingFrameNumbers, 0);
+            SendDataToGPUBuffer<uint32_t>(m_Engine.StartingAnimationNumbers, m_AnimationNumbersBuffer, 0);
 
             // Region to copy from the starting buffers to the persistent buffers
-            VkBufferCopy copyRegion = CreateBufferCopyRegion(0, 0, objectCount * sizeof(glm::vec2));
+            VkBufferCopy copyRegion = CreateBufferCopyRegion(0, 0, vec2allocationSize);
 
-            vkCmdCopyBuffer(m_CommandBuffer, StartingVelocities.buffer, m_VelocitiesBuffer.buffer, 1, &copyRegion);
-            vkCmdCopyBuffer(m_CommandBuffer, StartingPositions.buffer, m_PositionsBuffer.buffer, 1, &copyRegion);
+            ::vkCmdCopyBuffer(m_CommandBuffer, StartingVelocities.buffer, m_VelocitiesBuffer.buffer, 1, &copyRegion);
+            ::vkCmdCopyBuffer(m_CommandBuffer, StartingPositions.buffer, m_PositionsBuffer.buffer, 1, &copyRegion);
 
-            copyRegion.size = objectCount * sizeof(uint32_t);
-            vkCmdCopyBuffer(m_CommandBuffer, StartingFrameNumbers.buffer, m_FrameNumbersBuffer.buffer, 1, &copyRegion);
+            copyRegion.size = uintallocationSize;
+            ::vkCmdCopyBuffer(m_CommandBuffer, StartingFrameNumbers.buffer, m_FrameNumbersBuffer.buffer, 1, &copyRegion);
 
-            EndCommandBuffer(); // End the command buffer recording
-            SubmitCommandBuffersAndWait(1); // Submit the command buffer and wait for completion
-
-            // Clean up the starting buffers after copying
-            DestroyBuffer(StartingVelocities);
-            DestroyBuffer(StartingPositions);
-            DestroyBuffer(StartingFrameNumbers);
+            // Memory barrier
+            CmdTransferToCompute();
         }
-    }
 
+        EndCommandBuffer();
+        SubmitCommandBuffersAndWait(1);
+
+        // Clean up the starting buffers after copying (now safely in scope)
+        DestroyBuffer(StartingVelocities);
+        DestroyBuffer(StartingPositions);
+        DestroyBuffer(StartingFrameNumbers);
+    }
 
     Renderer::AllocatedBuffer Renderer::CreateAndMapBuffer(VkDeviceSize size, VkBufferUsageFlags VkUsage, VmaMemoryUsage memoryUsage) 
     {
@@ -203,6 +226,198 @@ namespace Blokk {
                 throw std::runtime_error("Failed to create synchronization objects for a frame!");
             }
         }
+    }
+
+    inline void Renderer::CmdComputeToComputeBarrier()
+    {
+        vkCmdPipelineBarrier(
+            m_CommandBuffer,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            0,
+            0, nullptr,
+            5, m_ComputeToComputeBarriers, 
+            0, nullptr
+        );
+    }
+
+    inline void Renderer::CmdComputeToDrawBarrier()
+    {
+        vkCmdPipelineBarrier(
+            m_CommandBuffer,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT | VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+            0,
+            0, nullptr,
+            3, m_ComputeToDrawBarriers, 
+            0, nullptr
+        );
+    }
+
+    inline void Renderer::CmdTransferToComputeBarrier()
+    {
+        vkCmdPipelineBarrier(
+            m_CommandBuffer,
+            VK_PIPELINE_STAGE_TRANSFER_BIT,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            0,
+            0, nullptr,
+            5, m_TransferToComputeBarriers,
+            0, nullptr
+        );
+    }
+
+    void Renderer::CreateMemoryBarriers()
+    {
+        m_ComputeToComputeBarriers[0] = {
+            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+            .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .buffer = m_VelocitiesBuffer.buffer,
+            .offset = 0,
+            .size = VK_WHOLE_SIZE
+        };
+
+        m_ComputeToComputeBarriers[1] = {
+            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+            .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .buffer = m_PositionsBuffer.buffer,
+            .offset = 0,
+            .size = VK_WHOLE_SIZE
+        };
+
+        m_ComputeToComputeBarriers[2] = {
+            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+            .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .buffer = m_FrameNumbersBuffer.buffer,
+            .offset = 0,
+            .size = VK_WHOLE_SIZE
+        };
+
+        m_ComputeToComputeBarriers[3] = {
+            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+            .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .buffer = m_AnimationNumbersBuffer.buffer,
+            .offset = 0,
+            .size = VK_WHOLE_SIZE
+        };
+
+        m_ComputeToComputeBarriers[4] = {
+            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+            .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,          // Written by Deletion Pass 1
+            .dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT, // Read/written by Deletion Pass 2
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .buffer = m_IndexesToDeleteBuffer.buffer,
+            .offset = 0,
+            .size = VK_WHOLE_SIZE
+        };
+
+        // GPU Draw Indirect buffers -------------------------------------------------
+        
+        // [0] Indirect Args / Draw Buffer Barrier (Compute Write -> Indirect Command Read)
+        m_ComputeToDrawBarriers[0] = {
+            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+            .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_INDIRECT_COMMAND_READ_BIT,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .buffer = m_IndirectDrawBuffer.buffer, // Your u9 buffer handle
+            .offset = 0,
+            .size = VK_WHOLE_SIZE
+        };
+
+        // [1] Visible Indexes Buffer Barrier (Compute Write -> Shader Read / Vertex Attribute Read)
+        m_ComputeToDrawBarriers[1] = {
+            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+            .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .buffer = m_VisibleIndexesBuffer.buffer, // Your u8 buffer handle
+            .offset = 0,
+            .size = VK_WHOLE_SIZE
+        };
+
+        // [2] Render Positions Buffer Barrier (Compute Write -> Vertex Attribute Read)
+        m_ComputeToDrawBarriers[2] = {
+            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+            .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .buffer = m_RenderPositionsBuffer.buffer, // Your u10 buffer handle
+            .offset = 0,
+            .size = VK_WHOLE_SIZE
+        };
+
+        // CPU buffer update barriers ------------------------------------------------------------
+        
+        m_TransferToComputeBarriers[0] = {
+            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+            .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .buffer = m_VelocitiesBuffer.buffer,
+            .offset = 0,
+            .size = VK_WHOLE_SIZE
+        };
+
+        m_TransferToComputeBarriers[1] = {
+            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+            .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .buffer = m_PositionsBuffer.buffer,
+            .offset = 0,
+            .size = VK_WHOLE_SIZE
+        };
+
+        m_TransferToComputeBarriers[2] = {
+            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+            .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .buffer = m_FrameNumbersBuffer.buffer,
+            .offset = 0,
+            .size = VK_WHOLE_SIZE
+        };
+
+        m_TransferToComputeBarriers[3] = {
+            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+            .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .buffer = m_AnimationNumbersBuffer.buffer,
+            .offset = 0,
+            .size = VK_WHOLE_SIZE
+        };
+
+        m_TransferToComputeBarriers[4] = {
+            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+            .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT, 
+            .dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT, // Read/written by deletion compute passes
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .buffer = m_IndexesToDeleteBuffer.buffer,
+            .offset = 0,
+            .size = VK_WHOLE_SIZE
+        };
     }
 
     void Renderer::CreateCommandPoolAndBuffers() 
@@ -359,16 +574,18 @@ namespace Blokk {
 
     void Renderer::CreateComputeShaderLayout() {
         std::vector<VkDescriptorSetLayoutBinding> bindings = {
-            {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}, // t0: Velocities
-            {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}, // t1: Positions
-            {2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}, // t2: AnimationSizes
-            {3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}, // t3: FrameDimensions
-            {4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}, // t4: FrameNumbers
-            {5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}, // t5: AnimationNumbers
-            {6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}, // t6: AnimationStarts
-            {7, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}, // t7: IsVisible
-            {8, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}, // t8: ToRender
-            {9, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}  // t9: RenderPositions
+            {0,  VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}, // t0: Velocities
+            {1,  VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}, // u1: Positions
+            {2,  VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}, // t2: AnimationSizes
+            {3,  VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}, // t3: FrameDimensions
+            {4,  VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}, // u4: FrameNumbers
+            {5,  VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}, // t5: AnimationNumbers
+            {6,  VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}, // t6: AnimationStarts
+            {7,  VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}, // u7: VisibleIndexes
+            {8,  VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}, // u8: IndirectArgs
+            {9,  VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}, // u9: RenderPositions
+            {10, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}, // u10: NumberOfIndexesToDelete
+            {11, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}  // u11: IndexesToDelete
         };
 
         VkDescriptorSetLayoutCreateInfo layoutInfo{
@@ -377,16 +594,14 @@ namespace Blokk {
             .pBindings = bindings.data()
         };
 
-        // Create and store descriptor set layout
         if (vkCreateDescriptorSetLayout(m_Device, &layoutInfo, nullptr, &m_DescriptorSetLayout) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to create descriptor set layout!"); // Handle failiure
+            throw std::runtime_error("Failed to create descriptor set layout!"); 
         }
 
-        // Push constants
         VkPushConstantRange pushConstantRange{
             .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
             .offset = 0,
-            .size = sizeof(ComputeShaderConstantFrameData) // 36 bytes; check Rendering.hpp
+            .size = sizeof(ConstantFrameData) 
         };
 
         VkPipelineLayoutCreateInfo pipelineLayoutInfo{
@@ -397,9 +612,8 @@ namespace Blokk {
             .pPushConstantRanges = &pushConstantRange
         };
 
-        // Create and store pipeline layout
         if (vkCreatePipelineLayout(m_Device, &pipelineLayoutInfo, nullptr, &m_PipelineLayout) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to create compute pipeline layout!"); // Handle failiure
+            throw std::runtime_error("Failed to create compute pipeline layout!"); 
         }
     }
 
@@ -417,15 +631,18 @@ namespace Blokk {
         return shaderModule;
     }
 
-    void Renderer::LoadAndStoreShaders() {
+    void Renderer::LoadAndStoreShaders() 
+    {
+        // Velocity ----------------------------------------
+
         auto velocityComputeShaderSource = LoadShaderFile("Velocities.comp.spv");
-        VkShaderModule velocityShader = CreateShaderModule(m_Device, velocityComputeShaderSource);
+        VkShaderModule velocityShaderModule = CreateShaderModule(m_Device, velocityComputeShaderSource);
 
         // Configure pipeline shader stage
         VkPipelineShaderStageCreateInfo shaderStageCreationInfo{
             .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
             .stage = VK_SHADER_STAGE_COMPUTE_BIT,
-            .module = velocityShader,
+            .module = velocityShaderModule,
             .pName = "main"
         };
 
@@ -443,7 +660,9 @@ namespace Blokk {
             throw std::runtime_error("Failed to create compute pipeline!");
         }
 
-        // Load compiled SPIR-V binary for your culling shader 
+        // Culling -----------------------------------------------------
+
+        // Load compiled SPIR-V binary for culling shader 
         auto cullingShaderCode = LoadShaderFile("Culling.comp.spv");
         VkShaderModule cullingShaderModule = CreateShaderModule(m_Device, cullingShaderCode);
 
@@ -469,9 +688,66 @@ namespace Blokk {
             throw std::runtime_error("Failed to create render culling compute pipeline!");
         }
 
+        // Deletion --------------------------------------------------
+
+        // Load compiled SPIR-V binary for deletion shader 
+        auto deletionShaderCode = LoadShaderFile("Deletion.comp.spv");
+        VkShaderModule deletionShaderModule = CreateShaderModule(m_Device, deletionShaderCode);
+
+        // Configure pipeline shader stage
+        VkPipelineShaderStageCreateInfo deletionStageInfo{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+            .stage = VK_SHADER_STAGE_COMPUTE_BIT,
+            .module = deletionShaderModule,
+            .pName = "main"
+        };
+
+        // Set up pipeline create info (reusing m_PipelineLayout!)
+        VkComputePipelineCreateInfo deletionPipelineInfo{
+            .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+            .stage = deletionStageInfo,
+            .layout = m_PipelineLayout,
+            .basePipelineHandle = VK_NULL_HANDLE,
+            .basePipelineIndex = -1
+        };
+
+        // Create the second compute pipeline
+        if (vkCreateComputePipelines(m_Device, VK_NULL_HANDLE, 1, &deletionPipelineInfo, nullptr, &m_ObjectDeletionPipeline) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create object deletion compute pipeline!");
+        }
+
+        // Frame number ------------------------------------------------------
+
+        // Load compiled SPIR-V binary for culling shader 
+        auto frameNumShaderCode = LoadShaderFile("Shaders/.comp.spv");
+        VkShaderModule deletionShaderModule = CreateShaderModule(m_Device, deletionShaderCode);
+
+        // Configure pipeline shader stage
+        VkPipelineShaderStageCreateInfo deletionStageInfo{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+            .stage = VK_SHADER_STAGE_COMPUTE_BIT,
+            .module = deletionShaderModule,
+            .pName = "main"
+        };
+
+        // Set up pipeline create info (reusing m_PipelineLayout!)
+        VkComputePipelineCreateInfo deletionPipelineInfo{
+            .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+            .stage = deletionStageInfo,
+            .layout = m_PipelineLayout,
+            .basePipelineHandle = VK_NULL_HANDLE,
+            .basePipelineIndex = -1
+        };
+
+        // Create the second compute pipeline
+        if (vkCreateComputePipelines(m_Device, VK_NULL_HANDLE, 1, &deletionPipelineInfo, nullptr, &m_ObjectDeletionPipeline) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create object deletion compute pipeline!");
+        }
+
         // Clean up the shader modules
-        vkDestroyShaderModule(m_Device, cullingShaderModule, nullptr);
-        vkDestroyShaderModule(m_Device, velocityShader, nullptr);
+        vkDestroyShaderModule(m_Device, cullingShaderModule, nullptr); // Culling
+        vkDestroyShaderModule(m_Device, velocityShaderModule, nullptr); // Velocity
+        vkDestroyShaderModule(m_Device, deletionShaderModule, nullptr); // Deletion
     }
 
 

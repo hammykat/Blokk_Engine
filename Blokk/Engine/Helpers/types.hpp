@@ -196,7 +196,9 @@ struct BulkObjectCreationData
 // TODO: make engine use
 struct GPUPipelineCreationData {
     bool CalledByEngineEveryFrame = true;
-    uint32_t MaxObjects = 1000;
+    uint32_t MaxObjectsAtOnce{};
+    uint32_t MaxObjectsCreatedAtOnce{};
+    uint32_t MaxObjectsDeletedAtOnce{};
     BulkObjectCreationData StartingData{};
 };
 

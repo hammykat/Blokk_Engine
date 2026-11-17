@@ -12,6 +12,7 @@
 
 #include <cassert>
 #include <filesystem>
+#include <format>
 #include <iostream>
 #include <span>
 #include <string>
@@ -24,6 +25,10 @@
 
 namespace Blokk 
 {
+    inline void Renderer::ExecuteFrame() {
+        RunComputeShaders();
+        DrawFrame();
+    }
 
     void Renderer::DrawFrame()
     {
@@ -125,11 +130,11 @@ namespace Blokk
         m_CurrentFrame = (m_CurrentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
     }
 
-    inline void Renderer::DestroyBuffer(AllocatedBuffer buffer) {
+    inline void Renderer::DestroyBuffer(AllocatedBuffer buffer) const {
         vmaDestroyBuffer(m_Allocator, buffer.buffer, buffer.allocation);
     }
 
-    inline void Renderer::SubmitCommandBuffersAndWait(int32_t cmdBufferCount) {
+    inline void Renderer::SubmitCommandBuffersAndWait(int32_t cmdBufferCount) const {
         VkSubmitInfo submitInfo{
             .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
             .commandBufferCount = cmdBufferCount,
@@ -195,7 +200,7 @@ namespace Blokk
             &frameData
         );
 
-        uint32_t groupCountX = (m_ObjectCount + 255) / 256;
+        uint32_t groupCountX = (m_GPU_ObjectCount + 255) / 256;
         vkCmdDispatch(m_CommandBuffer, groupCountX, 1, 1);
 
         // Create an array of barriers for all buffers written by compute that the draw call/vertex shader will read
@@ -445,60 +450,20 @@ namespace Blokk
 
     // Load multiple textures
     void Renderer::LoadAnimation(const std::vector<std::filesystem::path>& paths, const std::string& name) 
-{
-    uint32_t startIndex = static_cast<uint32_t>(m_Frames.size());
-
-    // Batch load all frame textures at once
-    LoadTextures(paths);
-
-    // Track the frame count and animation mapping
-    m_AnimationStarts.push_back(startIndex);
-    m_AnimationNames[name] = m_AnimationCount;
-    m_AnimationCount++;
-}
-    
-
-    // Get an animation's size (number of frames)
-    [[nodiscard]] inline uint32_t Renderer::GetAnimationSize(uint32_t idx) const 
     {
-        // Throw error (if debug mode) if loading failed
-        AssertWhenDebug(idx < AnimationStarts.size(),
-            std::format("Animation does not exist at index {} in Renderer::getAnimationSize", idx));
+        uint32_t startIndex = static_cast<uint32_t>(m_Frames.size());
 
-        if (idx == AnimationStarts.size() - 1) {
-            return Frames.size() - AnimationStarts[idx];
-        } else {
-            return AnimationStarts[idx + 1] - AnimationStarts[idx];
-        }
+        // Batch load all frame textures at once
+        LoadTextures(paths);
+
+        // Track the frame count and animation mapping
+        m_AnimationStarts.push_back(startIndex);
+        m_AnimationNames[name] = m_AnimationCount;
+        m_AnimationCount++;
     }
-    [[nodiscard]] inline uint32_t Renderer::GetAnimationSize(std::string name) const {
-        GetAnimationSize(GetAnimationIndex(name));
-    }
-    
-
-    // Returns the index of the animation in the renderer's data
-    template <bool IsVerified = false>
-    [[nodiscard]] inline Renderer::GetAnimationIndex(const std::string& name) 
-    {
-        // Don't bother to check if garunteed to exist
-        if constexpr (IsVerified) {
-            return AnimationNames[name];
-        } 
-        else {
-            // Find animation
-            auto It = AnimationNames.find(name);
-
-            // Throw error (if debug mode) if animation doesn't exist
-            AssertWhenDebug(It != AnimationNames.end(),
-                std::format("Animation '{}' doesn't exist in Renderer::GetFramesForAnimation()", name));
-
-            // Get index using name from data
-            return It->second;
-        }
-    }
-
+   
     void Renderer::SetWindow(Window& Window) {
-        window = Window;
+        m_Window = &Window;
     }
 
 } // namespace Blokk

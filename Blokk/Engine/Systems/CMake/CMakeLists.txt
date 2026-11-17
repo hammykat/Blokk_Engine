@@ -1,17 +1,12 @@
-add_library(Blokk STATIC
-    ../../GameObjects/Frames+Animation.cpp
-    ../../GameObjects/Position.cpp
-    ../../GameObjects/Velocity.cpp
-    ../../GameObjects/Visibility.cpp
-    ../../GameObjects/GameObject.cpp
-
-    ../IncrementFrames.cpp
-    ../Threading.cpp
-    ../UserUpdates.cpp
-    ../Velocities.cpp
-    ../Visibility_Culling/Visibility_AxisCulling.cpp
-    ../Visibility_Culling/Visibility_BasicCulling.cpp
+file(GLOB_RECURSE BLOKK_COMPILATION_FILES CONFIGURE_DEPENDS 
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../../Engine/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../../Engine/*.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../../Editor/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../../Editor/*.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../../Include/*.hpp"
 )
+
+add_library(Blokk STATIC ${BLOKK_COMPILATION_FILES})
 
 target_include_directories(Blokk
     PUBLIC
@@ -42,7 +37,7 @@ target_link_libraries(Blokk
 )
 
 # Shader compiler
-include("${CMAKE_CURRENT_LIST_DIR}/Shaders.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/ShaderCompiler.cmake")
 add_dependencies(Blokk CompileShaders)
 
 # SIMD DETECTOR -------------------------------------------------------------

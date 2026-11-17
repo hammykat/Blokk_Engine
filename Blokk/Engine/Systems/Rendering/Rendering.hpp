@@ -38,14 +38,17 @@ namespace Blokk {
 	};
 
 	class EngineCore;
+	class Window;
 
 	class Renderer {
 	private:
-		struct ComputeShaderConstantFrameData {
-			int objectCounts[3];
-			float cameraPosition[2];
-			float screenDimensions[2];
-			float deltaTime;
+		struct ConstantFrameData {
+			uint32_t ObjectCount;
+			uint32_t NumberOfIndexesToDelete;
+			uint32_t NumberOfObjectsSpawned; 
+			glm::vec2 CameraPosition;
+			glm::vec2 ScreenDimensions;
+			float DeltaTime;
 		};
 		
 		struct AllocatedBuffer {
@@ -74,13 +77,21 @@ namespace Blokk {
 			INDIRECT_BUFFER = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT
 		};
 
-		Window& m_Window;
+		enum class PipelineStage : uint32_t {
+			ComputeShader = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			VertexShader = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
+			DrawIndirect = VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT,
+			Transfer = VK_PIPELINE_STAGE_TRANSFER_BIT,
+			TopOpipe = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT
+		};
+
+		Window* m_Window;
 		EngineCore& m_Engine;
 
 		uint32_t m_GPU_ObjectCount; // Number of objects being updated by the GPU
 		uint32_t m_AnimationCount = 0;
+		constexpr uint8_t MAX_FRAMES_IN_FLIGHT = 2;
 
-		GLuint m_TexturePoolHandles[TextureSizeCount];
 		std::vector<Animation> m_AnimationData; 
 		std::unordered_map<std::string, uint32_t> m_AnimationNames;
 		std::vector<uint32_t> m_AnimationStarts;
@@ -116,22 +127,38 @@ namespace Blokk {
 		std::vector<VkImage> m_SwapchainImages;
 		std::vector<VkImageView> m_SwapchainImageViews;
 
+		// Shader pipelines
 		VkDescriptorSetLayout m_DescriptorSetLayout;
 		VkPipelineLayout m_PipelineLayout;
-		VkPipeline m_VelocitiesPipeline;
-		VkPipeline m_RenderCullingPipeline;
 		VkDescriptorSet m_DescriptorSet;
 		
+		VkPipeline m_VelocitiesPipeline;
+		VkPipeline m_RenderCullingPipeline;
+		VkPipeline m_ObjectDeletionPipeline;
+		VkPipeline m_FrameNumberUpdatePipeline;
+		
+		// Allocator
 		VmaAllocator m_Allocator;
+
+		// Cached memory barriers 
+		VkBufferMemoryBarrier m_ComputeToDrawBarriers[3];
+		VkBufferMemoryBarrier m_ComputeToComputeBarriers[5];
+		VkBufferMemoryBarrier m_TransferToComputeBarriers[5];
 
 		// Buffers
 		AllocatedBuffer m_VelocitiesBuffer;
 		AllocatedBuffer m_PositionsBuffer;
 		AllocatedBuffer m_AnimationNumbersBuffer;
 		AllocatedBuffer m_FrameNumbersBuffer;
+
 		AllocatedBuffer m_IndirectDrawBuffer;
 		AllocatedBuffer m_VisibleIndexesBuffer;
 
+		AllocatedBuffer m_NumberOfIndexesToDeleteBuffer;
+		AllocatedBuffer m_IndexesToDeleteBuffer;
+		AllocatedBuffer m_DeletionStagingBuffer;
+
+		// 
 		VkDescriptorSetLayout m_GlobalDescriptorSetLayout;
 		VkDescriptorSet m_GlobalBindlessDescriptorSet;
 		VkSampler m_GlobalTextureSampler;
@@ -147,17 +174,22 @@ namespace Blokk {
 		void CreateGraphicsQueues(vkb::Device vkb_device);
 		void CreateSwapchain();
 
+		void CreateMemoryBarriers();
 		void CreateComputeShaderLayout();
 		VkShaderModule CreateShaderModule(VkDevice device, const std::vector<uint32_t>& code);
 
+		inline void CmdComputeToComputeBarrier();
+		inline void CmdComputeToDrawBarrier();
+		inline void CmdTransferToComputeBarrier();
+
 		AllocatedBuffer CreateAndMapBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
-		void CreateAndMapAllBuffers(uint32_t objectCount);
-		void SubmitCommandBuffersAndWait(int32_t cmdBufferCount);
+		void CreateAndMapAllBuffers(GPUPipelineCreationData& data);
+		void SubmitCommandBuffersAndWait(int32_t cmdBufferCount) const;
 
 		void CreateBindlessDescriptorLayout();
 
-		inline void BeginCommandBuffer();
-		inline void EndCommandBuffer();
+		inline void BeginCommandBuffer() const;
+		inline void EndCommandBuffer() const;
 		[[nodiscard]] inline VkBufferCopy CreateBufferCopyRegion(uint32_t srcOffset, uint32_t dstOffset, VkDeviceSize size);
 		template<typename T>
 		void SendDataToCPUBuffer(AllocatedBuffer buffer, const std::vector<T>& data) {
@@ -203,8 +235,8 @@ namespace Blokk {
 		}
 
 		void RunComputeShaders();
-		inline void DestroyBuffer(AllocatedBuffer buffer);
-
+		inline void DestroyBuffer(AllocatedBuffer buffer) const;
+		inline void ExecuteFrame();
 
 	public:
 		friend class EngineCore;

@@ -11,11 +11,8 @@ struct VSOutput {
 };
 
 // Bindings matching your descriptor layout in space0
-[[vk::binding(0, 0)]] StructuredBuffer<int> XPositions   : register(t0, space0);
-[[vk::binding(1, 0)]] StructuredBuffer<int> YPositions   : register(t1, space0);
-[[vk::binding(2, 0)]] StructuredBuffer<int> Widths       : register(t2, space0);
-[[vk::binding(3, 0)]] StructuredBuffer<int> Heights      : register(t3, space0);
-[[vk::binding(8, 0)]] StructuredBuffer<uint> VisibleIndexes : register(t8, space0);
+[[vk::binding(1, 0)]] RWStructuredBuffer<float2> Positions : register(u1, space0);
+[[vk::binding(7, 0)]] RWStructuredBuffer<uint> VisibleIndexes : register(u7, space0);
 
 cbuffer ScreenDimensions : register(b5, space0) {
     int scrWidth;
