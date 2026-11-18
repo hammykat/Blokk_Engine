@@ -6,7 +6,7 @@
 #include <stdexcept>
 #include <vector>
 
-#include "Compute_Shaders/Rendering.hpp"
+#include "../Rendering/Rendering.hpp"
 
 namespace Blokk
 {
@@ -62,6 +62,24 @@ namespace Blokk
         OpenedThreads--;
     }
 
+#elifdef Blokk_Threading_AdaptiveTiming
+
+    void EngineCore::OpenThread()
+    {
+        Workers.emplace_back(std::make_unique<Worker>());
+        Workers.back()->Awake();
+
+        OpenedThreads++;
+    }
+
+    void EngineCore::DestroyThread()
+    {
+        Workers.back()->Stop();
+        Workers.pop_back();
+
+        OpenedThreads--;
+    }
+
 #endif
 
 double EngineCore::TimeCPUEngineProcesses()
@@ -79,7 +97,7 @@ double EngineCore::TimeCPUEngineProcesses()
 
         // Get ranges
         std::vector<IndexRange> VelRanges =
-            GetRanges(DynamicObjectCount, m_UsedThreads);
+            GetRanges(CPUObjectCount.Dynamic, m_UsedThreads);
 
         // Set function
         Worker::CurrentJob = UpdateRangeOfPositions;
@@ -137,7 +155,7 @@ double EngineCore::TimeCPUEngineProcesses()
 
             // Get ranges
             std::vector<IndexRange> VisRanges =
-                GetRanges(ObjectCount, m_UsedThreads);
+                GetRanges(CPUObjectCount.Total, m_UsedThreads);
 
             // Set function
             Worker::CurrentJob = CheckVisibleRange;
@@ -347,34 +365,34 @@ void EngineCore::UpdateObjects()
     // Set variables --------------------------
 
     ThreadRanges.clear();
-    FullRanges.clear();
+    m_FullRanges.clear();
 
-    ProcessingWorkerCount.store(0); // Workers increment variable by themselves, so reset
-    RangesCompleteCount.store(0); // No ranges have been completed
+    m_ProcessingWorkerCount.store(0); // Workers increment variable by themselves, so reset
+    m_RangesCompleteCount.store(0); // No ranges have been completed
 
     // Reset 
-    AllWorkComplete.store(false);
-    WorkCompleteBeingChecked.store(false);
+    m_AllWorkComplete.store(false);
+    m_WorkCompleteBeingChecked.store(false);
 
     // Get ranges -------------------------------------------------
 
     // Get the ranges each thread needs to complete
-    FullRanges = GetRanges(ObjectCount, UsedThreads);
+    m_FullRanges = GetRanges(CPUObjectCount.Total, m_UsedThreads);
     
     // Split the ranges into smaller ones
-    ThreadRanges.resize(ThreadCount);
+    ThreadRanges.resize(m_ThreadCount);
     
     // Nothing to do
-    if (ObjectCount == 0) return;
+    if (CPUObjectCount.Total == 0) return;
     
     // Number of ranges per thread
-    uint32_t RangeSize = FullRanges[0].GetSize();
+    uint32_t RangeSize = m_FullRanges[0].GetSize();
     
     // Split each full range into smaller ranges and assign them
-    for (uint32_t i = 0, count = FullRanges.size(); i < count; i++)
+    for (uint32_t i = 0, count = m_FullRanges.size(); i < count; i++)
     {
         // Get ranges
-        auto& Values = GetRanges(FullRanges[i].GetSize(), RangeSize);
+        auto& Values = GetRanges(m_FullRanges[i].GetSize(), RangeSize);
 
         // Reserve
         ThreadRanges[i].reserve(
@@ -393,7 +411,7 @@ void EngineCore::UpdateObjects()
     Worker::CurrentJob = UpdateRangeOfObjects;
 
     // Loop through ranges
-    for(uint32_t i = 0, Count = FullRanges.size(); i < Count; i++)
+    for(uint32_t i = 0, Count = m_FullRanges.size(); i < Count; i++)
     {
         // Assign a range (just to make the worker start working, as it
         // doesn't use the given range for updating objects)
@@ -423,7 +441,7 @@ void EngineCore::UpdateRangeOfObjects(Worker& worker)
     }
 
     // Work for itself complete
-    RangesCompleteCount.fetch_add(1);
+    m_RangesCompleteCount.fetch_add(1);
 
     // Stealing 
     StealUpdateObjects(idx);
@@ -433,10 +451,10 @@ void EngineCore::UpdateRangeOfObjects(Worker& worker)
 void EngineCore::StealUpdateObjects(uint32_t idx) 
 {
     // Keep attempting to steal until complete
-    while (!AllWorkComplete.load())
+    while (!m_AllWorkComplete.load())
     {
         // Loop through every worker
-        for (uint32_t i = 0; i < UsedThreads; i++)
+        for (uint32_t i = 0; i < m_UsedThreads; i++)
         {
             if (i == idx)
                 continue; // Don't steal from yourself
@@ -460,15 +478,15 @@ void EngineCore::UpdateCompletionVariables()
 {
     // If the work isn't being checked
     bool expected = false;
-    if (WorkCompleteBeingChecked.compare_exchange_strong(expected, true))
+    if (m_WorkCompleteBeingChecked.compare_exchange_strong(expected, true))
     {
         // Store the result
         bool allWorkersFinished = 
-            ProcessingWorkerCount == 0 // No workers are processing
-            && RangesCompleteCount == UsedThreads; // All ranges are processed
+            m_ProcessingWorkerCount == 0 // No workers are processing
+            && m_RangesCompleteCount == m_UsedThreads; // All ranges are processed
 
-        AllWorkComplete.store(allWorkersFinished);
-        WorkCompleteBeingChecked.store(false); // Reset
+        m_AllWorkComplete.store(allWorkersFinished);
+        m_WorkCompleteBeingChecked.store(false); // Reset
     }
 }
 
@@ -476,32 +494,32 @@ void EngineCore::UpdateCompletionVariables()
 void EngineCore::ProcessRange(IndexRange range)
 {
     // Started working
-    ProcessingWorkerCount.fetch_add(1);
+    m_ProcessingWorkerCount.fetch_add(1);
 
 	uint32_t remainingInRange = range.GetSize();
     uint32_t currentObjIdx = range.Start;
 
-    double delta = DeltaTime.secs;
+    double delta = m_DeltaTime.secs;
 
     // Keep processing until no more objects are left in the range
     while (remainingInRange != 0)
     {
         // Process the object
-        ObjectInstances[currentObjIdx]->_Update(delta);
+        m_ObjectInstances[currentObjIdx]->_Update(delta);
 
         remainingInRange--;
         currentObjIdx++;
     }
 
     // Stopped working
-    ProcessingWorkerCount.fetch_add(-1);
+    m_ProcessingWorkerCount.fetch_add(-1);
 }
 
 void EngineCore::TimeUpdateRangeOfObjects(Worker& worker)
 {
     IndexRange Range = worker.getRange();
 
-    double delta = DeltaTime.secs;
+    double delta = m_DeltaTime.secs;
 
 	for (uint32_t i = Range.Start, count = Range.End; i < count; i++)
 	{
@@ -509,38 +527,53 @@ void EngineCore::TimeUpdateRangeOfObjects(Worker& worker)
 		auto start = std::chrono::steady_clock::now();
 
 		// Run function
-		ObjectInstances[i]->_Update(delta);
+		m_ObjectInstances[i]->_Update(delta);
 
 		// End time
 		auto end = std::chrono::steady_clock::now();
 
 		// Store time
         auto totalTime = std::chrono::duration_cast<nanoseconds>(end - start).count();
-        TotalUpdateTimes[i] += totalTime;
-        TotalUpdateTime += totalTime;
+        m_TotalUpdateTimes[i] += totalTime;
+        m_TotalUpdateTime += totalTime;
 	}
 }
 
 // Gets all the average update times of gameObject Update() functions
 void EngineCore::GetAverageUpdateTimes() 
 {
-    uint32_t count = AverageUpdateTimes.size();
+    uint32_t count = m_AverageUpdateTimes.size();
     for (uint32_t i = 0; i < count; i++) {
-        AverageUpdateTimes[i] = TotalUpdateTimes[i] / NumberOfTrials;
+        m_AverageUpdateTimes[i] = TotalUpdateTimes[i] / NumberOfTrials;
     }
 }
 
 // Resets update times
 void EngineCore::ResetUpdateTimes() {
-	std::fill(TotalUpdateTimes.begin(), TotalUpdateTimes.end(), 0);
-    std::fill(AverageUpdateTimes.begin(), AverageUpdateTimes.end(), 0);
+	std::fill(m_TotalUpdateTimes.begin(), m_TotalUpdateTimes.end(), 0);
+    std::fill(m_AverageUpdateTimes.begin(), m_AverageUpdateTimes.end(), 0);
 }
 
 
 // TODO: Make loading function smoother, currently can stutter
 // Loads the engine. It adapts to the load, allowing other
-void EngineCore::LoadEngine(uint32_t Threading_NumberOfTests, Renderer& p_Renderer)
+void EngineCore::LoadEngine(uint32_t Threading_NumberOfTests, Renderer* p_Renderer = nullptr)
 {
+    // Check if there is a renderer available to use
+    Renderer* renderer;
+    if (p_Renderer == nullptr) {
+        if (m_Renderer = nullptr) {
+            throw std::runtime_error("Blokk Error: Renderer was not passed or set before calling EngineCore::LoadEngine");
+        }
+        else { // Renderer was set
+            renderer = m_Renderer;
+        }
+    }
+    else { // Renderer was passed
+        renderer = p_Renderer;
+    }
+
+    // Vars
     m_NumberOfTrials++;
     nanoseconds totalTime{ 0 };
 
@@ -558,7 +591,7 @@ void EngineCore::LoadEngine(uint32_t Threading_NumberOfTests, Renderer& p_Render
             auto start = std::chrono::steady_clock::now();
 
             // Load animation
-            p_Renderer.LoadTextures(m_AnimationPaths[i], m_AnimationNames[i]);
+            renderer->LoadTextures(m_AnimationPaths[i], m_AnimationNames[i]);
 
             // End time
             auto end = std::chrono::steady_clock::now();
@@ -587,7 +620,7 @@ void EngineCore::LoadEngine(uint32_t Threading_NumberOfTests, Renderer& p_Render
         }
     
 	    Worker::CurrentJob = TimeUpdateRangeOfObjects;
-	    std::vector<IndexRange> Ranges = GetRanges(ObjectCount, m_UsedThreads);
+	    std::vector<IndexRange> Ranges = GetRanges(CPUObjectCount.Total, m_UsedThreads);
 
         // Set each worker's assigned ranges
         uint32_t count = Ranges.size();
@@ -616,7 +649,8 @@ void EngineCore::LoadEngine(uint32_t Threading_NumberOfTests, Renderer& p_Render
     {
         // If no objects need to be updated
         if (CPUObjectCount.Total == 0) {
-            break; // TODO: I don't think break can go here, add proper thing
+            m_CurrentLoadingStage = LoadingStage::AdaptiveThreading;
+            return; 
         }
 
         if (m_TotalUpdateTime > m_FrameTime.nano) 

@@ -63,7 +63,7 @@ namespace Blokk
 
     struct ManagerCreation
     {
-        vector2<uint32_t> ScreenDimensions;
+        glm::vec2 ScreenDimensions;
         uint32_t FPS = 30;
     };
 
@@ -123,9 +123,8 @@ namespace Blokk
             m_ScreenDimensions(static_cast<glm::vec2>(Cr.ScreenDimensions)),
 
             // Counts
-            ObjectCount(0),
-            StaticObjectCount(0),
-            DynamicObjectCount(0)
+            CPUObjectCount(0),
+            GPUObjectCount(0)
         {
 
             // Throw an error if no threads were found
@@ -142,12 +141,18 @@ namespace Blokk
             // Set the worker's manager
             Worker::Manager = this;
 
-            // Open all threads
-            for(uint32_t i = 0; i < m_ThreadCount; i++)
-            {
+            // Open starting threads
+            #ifdef Blokk_Threading_AdaptiveTiming
+                // Open all threads
+                for(uint32_t i = 0; i < m_ThreadCount; i++)
+                {
+                    OpenThread();
+                    Workers[i]->setID(i);
+                }
+            #elseifdef Blokk_Threading_Manual
+                // Only open one starting thread 
                 OpenThread();
-                Workers[i]->setID(i);
-            }
+            #endif
 
             // Get the proper functions
             GetFunctions();
@@ -159,7 +164,7 @@ namespace Blokk
         ~EngineCore()
         {
             // Destroy all objects
-            for (uint32_t i = 0; i < ObjectCount; i++) {
+            for (uint32_t i = 0; i < CPUObjectCount.Total; i++) {
                 delete m_ObjectInstances[i];
             }
 
@@ -372,6 +377,11 @@ namespace Blokk
 
         // Functions -------------------------------------------------
 
+        #ifdef Blokk_Threading_AdaptiveTiming
+        void OpenThread();
+        void DestroyThread();
+        #endif
+
         void SetRenderer(Renderer& p_Renderer) {
             m_Renderer = &p_Renderer;
         }
@@ -467,8 +477,6 @@ namespace Blokk
         IncrementFramesFnPtr IncrementFrames;
 
         // GameObject update functions
-        #ifdef Blokk_GameObject_UpdateFunctions
-
         void UpdateObjects();
         void TimeUpdateRangeOfObjects(Worker& worker);
         void ResetUpdateTimes();
@@ -480,8 +488,6 @@ namespace Blokk
         void GetAverageUpdateTimes();
         void Remove_Function(uint32_t idx);
         
-        #endif
-
-        void LoadEngine(uint32_t Threading_NumberOfTests);
+        void LoadEngine(uint32_t Threading_NumberOfTests, Renderer* p_Renderer = nullptr)
     };
 }

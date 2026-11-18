@@ -1,7 +1,8 @@
 #include <GLFW/glfw3.h>
-#include <iostream>
 #include <cassert>
+#include <iostream>
 
+#include "Window.hpp"
 #include "types.hpp"
 
 namespace Blokk {
@@ -135,9 +136,9 @@ namespace Blokk {
     }
 
     // Get the dimensions of the window
-    vector2<uint32_t> Window::getDimensions() {
+    glm::ivec2 Window::getDimensions() {
         assert(window_ != nullptr && "Blokk: Window is not correctly initialized before using Window::getDimensions");
-        vector2<int32_t> dimensions;
+        glm::ivec2 dimensions;
         glfwGetWindowSize(window_, &dimensions.x, &dimensions.y);
         return dimensions;
     }

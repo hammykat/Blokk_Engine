@@ -11,7 +11,6 @@
 #include <filesystem>
 #include <iostream>
 #include <span>
-#include <span>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -91,7 +90,7 @@ namespace Blokk {
 
 		uint32_t m_GPU_ObjectCount; // Number of objects being updated by the GPU
 		uint32_t m_AnimationCount = 0;
-		constexpr uint8_t MAX_FRAMES_IN_FLIGHT = 2;
+		const uint8_t MAX_FRAMES_IN_FLIGHT = 2;
 
 		std::vector<Animation> m_AnimationData; 
 		std::unordered_map<std::string, uint32_t> m_AnimationNames;
