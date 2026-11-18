@@ -97,7 +97,7 @@ double EngineCore::TimeCPUEngineProcesses()
 
         // Get ranges
         std::vector<IndexRange> VelRanges =
-            GetRanges(CPUObjectCount.Dynamic, m_UsedThreads);
+            GetRanges(m_ObjectCount.Dynamic, m_UsedThreads);
 
         // Set function
         Worker::CurrentJob = UpdateRangeOfPositions;
@@ -117,7 +117,7 @@ double EngineCore::TimeCPUEngineProcesses()
             #endif
 
             // Let the main thread increment
-            (this->*IncrementFrames)(m_FrameNumbers, CPUObjectCount.Total);
+            (this->*IncrementFrames)(m_FrameNumbers, m_ObjectCount.Total);
 
             #ifdef Blokk_Diagnostics
                 auto EndTime = std::chrono::steady_clock::now();
@@ -155,7 +155,7 @@ double EngineCore::TimeCPUEngineProcesses()
 
             // Get ranges
             std::vector<IndexRange> VisRanges =
-                GetRanges(CPUObjectCount.Total, m_UsedThreads);
+                GetRanges(m_ObjectCount.Total, m_UsedThreads);
 
             // Set function
             Worker::CurrentJob = CheckVisibleRange;
@@ -227,7 +227,7 @@ double EngineCore::TimeGPUEngineProcesses()
 double EngineCore::TimeEngineProcesses()
 {
     double totalTime = 0;
-    if (CPUObjectCount.Total != 0) {
+    if (m_ObjectCount.Total != 0) {
         totalTime += TimeCPUEngineProcesses();
     }
 
@@ -377,13 +377,13 @@ void EngineCore::UpdateObjects()
     // Get ranges -------------------------------------------------
 
     // Get the ranges each thread needs to complete
-    m_FullRanges = GetRanges(CPUObjectCount.Total, m_UsedThreads);
+    m_FullRanges = GetRanges(m_ObjectCount.Total, m_UsedThreads);
     
     // Split the ranges into smaller ones
     ThreadRanges.resize(m_ThreadCount);
     
     // Nothing to do
-    if (CPUObjectCount.Total == 0) return;
+    if (m_ObjectCount.Total == 0) return;
     
     // Number of ranges per thread
     uint32_t RangeSize = m_FullRanges[0].GetSize();
@@ -544,7 +544,7 @@ void EngineCore::GetAverageUpdateTimes()
 {
     uint32_t count = m_AverageUpdateTimes.size();
     for (uint32_t i = 0; i < count; i++) {
-        m_AverageUpdateTimes[i] = TotalUpdateTimes[i] / NumberOfTrials;
+        m_AverageUpdateTimes[i] = m_TotalUpdateTimes[i] / m_NumberOfTrials;
     }
 }
 
@@ -614,13 +614,13 @@ void EngineCore::LoadEngine(uint32_t Threading_NumberOfTests, Renderer* p_Render
     if (m_CurrentLoadingStage == LoadingStage::TimingUpdateFunctions) 
     {
         ResetUpdateTimes(); // Set all to 0
-        if(CPUObjectCount.Total == 0) {
+        if(m_ObjectCount.Total == 0) {
             m_CurrentLoadingStage = LoadingStage::AdaptiveThreading;
             return;
         }
     
 	    Worker::CurrentJob = TimeUpdateRangeOfObjects;
-	    std::vector<IndexRange> Ranges = GetRanges(CPUObjectCount.Total, m_UsedThreads);
+	    std::vector<IndexRange> Ranges = GetRanges(m_ObjectCount.Total, m_UsedThreads);
 
         // Set each worker's assigned ranges
         uint32_t count = Ranges.size();
@@ -648,7 +648,7 @@ void EngineCore::LoadEngine(uint32_t Threading_NumberOfTests, Renderer* p_Render
     if (m_CurrentLoadingStage == LoadingStage::FilterUpdateFunctions)
     {
         // If no objects need to be updated
-        if (CPUObjectCount.Total == 0) {
+        if (m_ObjectCount.Total == 0) {
             m_CurrentLoadingStage = LoadingStage::AdaptiveThreading;
             return; 
         }
@@ -739,9 +739,9 @@ void EngineCore::LoadEngine(uint32_t Threading_NumberOfTests, Renderer* p_Render
 
 
 inline void EngineCore::Remove_Function(uint32_t idx) {
-    UpdateFunctionsSet[idx] = false;
-    UpdatePriorities[idx] = UINT8_MAX;
-    AverageUpdateTimes[idx] = nanoseconds_zero;
+    m_UpdateFunctionsSet[idx] = false;
+    m_UpdatePriorities[idx] = UINT8_MAX;
+    m_AverageUpdateTimes[idx] = nanoseconds_zero;
 }
 
 

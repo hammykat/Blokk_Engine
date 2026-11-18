@@ -1,9 +1,8 @@
-#include "GameObject.hpp"
 #include "EngineClassData.hpp"
+#include "GameObject.hpp"
 
 #include <cmath>
 
-#define Vel_ZERO vector2<float>{0, 0}
 
 namespace Blokk {
 
@@ -26,18 +25,18 @@ void GameObject::SetVelocity(float xvel, float YVel)
         if(IsStatic) 
         {
             // Set to dynamic
-            SetToDynamic(vector2<float>{xvel, YVel});
+            SetToDynamic(vec2<float>{xvel, YVel});
         }
         else // if dynamic
         {
             // Set X and Y
-            Engine->XVelocities[EngineIdx] = xvel;
-            Engine->YVelocities[EngineIdx] = YVel;
+            Engine->m_XVelocities[EngineIdx] = xvel;
+            Engine->m_YVelocities[EngineIdx] = YVel;
         }
     }
 }
 
-void GameObject::SetVelocity(vector2<float> Velocity) 
+void GameObject::SetVelocity(vec2<float> Velocity) 
 {
     SetVelocity(Velocity.x, Velocity.y);
 }
@@ -64,7 +63,7 @@ void GameObject::SetVelocityX(float XVel)
             else // If staying dynamic
             {
                 // Set X
-                Engine->XVelocities[EngineIdx] = XVel;
+                Engine->m_XVelocities[EngineIdx] = XVel;
             }
         }
     } 
@@ -74,12 +73,12 @@ void GameObject::SetVelocityX(float XVel)
         if(IsStatic) 
         {
             // Set to dynamic with vel
-            SetToDynamic(vector2<float>(XVel, 0));
+            SetToDynamic(vec2<float>(XVel, 0));
         }
         else // If dynamic
         {
             // Set X
-            Engine->XVelocities[EngineIdx] = XVel;
+            Engine->m_XVelocities[EngineIdx] = XVel;
         }
     }
 }
@@ -106,7 +105,7 @@ void GameObject::SetVelocityY(float YVel)
             else // If staying dynamic
             {
                 // Set Y
-                Engine->YVelocities[EngineIdx] = YVel;
+                Engine->m_YVelocities[EngineIdx] = YVel;
             }
         }
     } 
@@ -116,31 +115,31 @@ void GameObject::SetVelocityY(float YVel)
         if(IsStatic) 
         {
             // Set to dynamic with vel
-            SetToDynamic(vector2<float>(0, YVel));
+            SetToDynamic(vec2<float>(0, YVel));
         }
         else // If dynamic
         {
             // Set Y
-            Engine->YVelocities[EngineIdx] = YVel;
+            Engine->m_YVelocities[EngineIdx] = YVel;
         }
     }
 }
 
 // Get
-vector2<float> GameObject::GetVelocity() 
+vec2<float> GameObject::GetVelocity() 
 {
     // If the object is static
     if(IsStatic)
     {
         // Give the static velocity (Always 0)
-        return Vel_ZERO;
+        return vec2<float>(0, 0);
     }
     else // If the object is dynamic
     {
         // Get the velocity from the manager
         return {
-            Engine->XVelocities[EngineIdx], 
-            Engine->YVelocities[EngineIdx]
+            Engine->m_XVelocities[EngineIdx], 
+            Engine->m_YVelocities[EngineIdx]
         };
     }
 }
@@ -155,7 +154,7 @@ float GameObject::GetVelocityX()
     else // If the object is dynamic
     {
         // Get the vel from the manager's data
-        return Engine->XVelocities[EngineIdx];
+        return Engine->m_XVelocities[EngineIdx];
     }
 }
 
@@ -169,7 +168,7 @@ float GameObject::GetVelocityY()
     else // If the object is dynamic
     {
         // Get the vel from the manager's data
-        return Engine->YVelocities[EngineIdx];
+        return Engine->m_YVelocities[EngineIdx];
     }
 }
 
@@ -179,8 +178,8 @@ float GameObject::GetSpeed()
     // If static return 0, not moving
     if(IsStatic) return 0;
 
-    float XVel = Engine->XVelocities[EngineIdx];
-    float YVel = Engine->YVelocities[EngineIdx];
+    float XVel = Engine->m_XVelocities[EngineIdx];
+    float YVel = Engine->m_YVelocities[EngineIdx];
 
     return sqrt(XVel * XVel + YVel * YVel);
 }
@@ -190,8 +189,8 @@ float GameObject::GetSpeedSquared()
     // If static return 0, not moving
     if(IsStatic) return 0;
 
-    float XVel = Engine->XVelocities[EngineIdx];
-    float YVel = Engine->YVelocities[EngineIdx];
+    float XVel = Engine->m_XVelocities[EngineIdx];
+    float YVel = Engine->m_YVelocities[EngineIdx];
 
     return XVel * XVel + YVel * YVel;
 }
@@ -224,8 +223,8 @@ void GameObject::ReverseVelocity()
     if(IsStatic) return;
 
     // Reverse X and Y
-    Engine->XVelocities[EngineIdx] *= -1;
-    Engine->YVelocities[EngineIdx] *= -1;
+    Engine->m_XVelocities[EngineIdx] *= -1;
+    Engine->m_YVelocities[EngineIdx] *= -1;
 }
 
 void GameObject::ReverseVelocityX() 
@@ -234,7 +233,7 @@ void GameObject::ReverseVelocityX()
     if(IsStatic) return;
 
     // Reverse X
-    Engine->XVelocities[EngineIdx] *= -1;
+    Engine->m_XVelocities[EngineIdx] *= -1;
 }
 
 void GameObject::ReverseVelocityY() 
@@ -243,7 +242,7 @@ void GameObject::ReverseVelocityY()
     if(IsStatic) return;
 
     // Reverse Y
-    Engine->YVelocities[EngineIdx] *= -1;
+    Engine->m_YVelocities[EngineIdx] *= -1;
 }
 
 // Multiply ------------------------------------------------
@@ -265,11 +264,11 @@ void GameObject::MultiplyVelocity(float FactorX, float FactorY)
     }
 
     // Update data
-    Engine->XVelocities[EngineIdx] *= FactorX;
-    Engine->YVelocities[EngineIdx] *= FactorY;
+    Engine->m_XVelocities[EngineIdx] *= FactorX;
+    Engine->m_YVelocities[EngineIdx] *= FactorY;
 }
 
-void GameObject::MultiplyVelocity(vector2<float> Factor) 
+void GameObject::MultiplyVelocity(vec2<float> Factor) 
 {
     MultiplyVelocity(Factor.x, Factor.y);
 }
@@ -301,17 +300,17 @@ void GameObject::AddVelocity(float XVel, float YVel)
     if(IsStatic)
     {
         // Set to dynamic
-        SetToDynamic(vector2<float>{XVel, YVel});
+        SetToDynamic(vec2<float>{XVel, YVel});
     }
     else // If the object is dynamic
     {
         // Add
-        Engine->XVelocities[EngineIdx] += XVel;
-        Engine->YVelocities[EngineIdx] += YVel;
+        Engine->m_XVelocities[EngineIdx] += XVel;
+        Engine->m_YVelocities[EngineIdx] += YVel;
     }
 }
 
-void GameObject::AddVelocity(vector2<float> Vel) 
+void GameObject::AddVelocity(vec2<float> Vel) 
 {
     AddVelocity(Vel.x, Vel.y);
 }
@@ -324,11 +323,11 @@ void GameObject::DivideVelocity(float XVel, float YVel)
     if(XVel == 0 || YVel == 0 || IsStatic) return;
 
     // Divide
-    Engine->XVelocities[EngineIdx] /= XVel;
-    Engine->YVelocities[EngineIdx] /= YVel;
+    Engine->m_XVelocities[EngineIdx] /= XVel;
+    Engine->m_YVelocities[EngineIdx] /= YVel;
 }
 
-void GameObject::DivideVelocity(vector2<float> Vel) 
+void GameObject::DivideVelocity(vec2<float> Vel) 
 {
     DivideVelocity(Vel.x, Vel.y);
 }

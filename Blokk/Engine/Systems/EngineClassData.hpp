@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <filesystem>
 #include <glm/glm.hpp>
 #include <memory>
 #include <string>
@@ -123,7 +124,7 @@ namespace Blokk
             m_ScreenDimensions(static_cast<glm::vec2>(Cr.ScreenDimensions)),
 
             // Counts
-            CPUObjectCount(0),
+            m_ObjectCount(0),
             GPUObjectCount(0)
         {
 
@@ -164,7 +165,7 @@ namespace Blokk
         ~EngineCore()
         {
             // Destroy all objects
-            for (uint32_t i = 0; i < CPUObjectCount.Total; i++) {
+            for (uint32_t i = 0; i < m_ObjectCount.Total; i++) {
                 delete m_ObjectInstances[i];
             }
 
@@ -268,9 +269,6 @@ namespace Blokk
         // Pointers to object instances
         std::vector<GameObject*> m_ObjectInstances;
 
-        // Rendering
-        std::vector<uint32_t> RenderObjectIdxs; // Indexes to objects that need to get rendered
-
         // Frmae timings -----------------------------
         struct Timings
         {
@@ -373,7 +371,7 @@ namespace Blokk
 
         // Counts
         Counts GPUObjectCount; // Objects that are updated by GPU
-        Counts CPUObjectCount; // Objects that are updated by the CPU
+        Counts m_ObjectCount; // Objects that are updated by the CPU
 
         // Functions -------------------------------------------------
 
@@ -421,7 +419,7 @@ namespace Blokk
             *Result = GetRanges(Length, Count);
         }
 
-
+        void GetFunctions();
         
 
         // Time engine processes -------------------------------------
@@ -467,7 +465,7 @@ namespace Blokk
 
         void ProcessAddCommand(EngineObjectCreationParams Fields);
 
-        void ProcessAddCommand(bool Visible, vector2<float> Velocity, vector2<float> Position, GameObject* Object);
+        void ProcessAddCommand(bool Visible, vec2<float> Velocity, vec2<float> Position, GameObject* Object);
 
         // Frame increment --------------------------------------------
 

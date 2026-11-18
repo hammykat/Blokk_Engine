@@ -2,7 +2,7 @@
 #include "stb_image.h"
 
 #define VMA_IMPLEMENTATION
-#include <vk_mem_alloc.h>
+#include <vma/vk_mem_alloc.h>
 
 #include <GLFW/glfw3.h>
 #include <VkBootstrap.h>
@@ -22,6 +22,7 @@
 #include "types.hpp"
 
 #include "../EngineClassData.hpp"
+#include "Window/Window.hpp"
 
 namespace Blokk 
 {
@@ -52,8 +53,8 @@ namespace Blokk
             // Handle minimization (width or height is 0)
             int width = 0, height = 0;
             while (width == 0 || height == 0) {
-                width = m_Window.GetWidth();
-                height = m_Window.GetHeight();
+                width = m_Window->GetWidth();
+                height = m_Window->GetHeight();
                 glfwWaitEvents(); // Pause execution until window comes back or unminimizes
             }
 
@@ -185,10 +186,10 @@ namespace Blokk
         );
 
         ConstantFrameData frameData{
-            .deltaTime = m_Engine.m_DeltaTime.secs,
-            .screenDimensions = m_Window.GetDimensions(),
-            .cameraPosition = m_Engine.Camera.position,
-            .objectCounts = m_GPU_ObjectCount
+            .ObjectCount = m_GPU_ObjectCount,
+            .CameraPosition = m_Engine.Camera.position,
+            .ScreenDimensions = m_Window->GetDimensions(),
+            .DeltaTime = m_Engine.m_DeltaTime.secs,
         };
 
         vkCmdPushConstants(

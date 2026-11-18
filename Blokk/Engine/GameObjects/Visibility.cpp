@@ -1,7 +1,7 @@
-#include "GameObject.hpp"
 #include "EngineClassData.hpp"
+#include "GameObject.hpp"
 
-#ifdef Blokk_Rendering_Enabled
+//#ifdef Blokk_Rendering_Enabled
 
 namespace Blokk {
 
@@ -12,7 +12,7 @@ void GameObject::Show() // Assumes that the object was invisible before
     IsVisible = true;
 
     // Set to visible
-    Engine->IsVisible[EngineIdx] = true;
+    m_Engine->IsVisible[EngineIdx] = true;
 }
 
 // Set to invisible

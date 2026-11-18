@@ -1,9 +1,8 @@
 #include <utility>
 #include <vector>
 
-#include "Cached/GameObject.hpp"
 #include "EngineClassData.hpp"
-#include "Uncached/GameObject.hpp"
+#include "GameObject.hpp"
 #include "types.hpp"
 
 namespace Blokk {
@@ -11,26 +10,26 @@ namespace Blokk {
 void EngineCore::DestroyStaticObject(uint32_t ObjIdx)
 {
     // Swap with the last item
-    SwapStaticObjects(ObjIdx, ObjectCount - 1);
+    SwapStaticObjects(ObjIdx, m_ObjectCount.Total - 1);
 
     // Remove the object
     m_XPositions.pop_back();
     m_YPositions.pop_back();
     m_ObjectInstances.pop_back();
 
-    CPUObjectCount.Static--;
-    CPUObjectCount.Total--;
+    m_ObjectCount.Static--;
+    m_ObjectCount.Total--;
 }
 
 void EngineCore::DestroyDynamicObject(uint32_t ObjIdx)
 {
     // Swap with the last item
-    SwapDynamicObjects(ObjIdx, DynamicObjectCount - 1);
+    SwapDynamicObjects(ObjIdx, m_ObjectCount.Dynamic - 1);
 
-    if(StaticObjectCount > 0)
+    if(m_ObjectCount.Static > 0)
     {
         // Swap with the last static item
-        SwapStaticObjects(DynamicObjectCount - 1, ObjectCount - 1);
+        SwapStaticObjects(m_ObjectCount.Dynamic - 1, m_ObjectCount.Total - 1);
     }
 
     // Remove the object from the back
@@ -40,11 +39,11 @@ void EngineCore::DestroyDynamicObject(uint32_t ObjIdx)
     m_YVelocities.pop_back();
     m_ObjectInstances.pop_back();
 
-    CPUObjectCount.Dynamic--;
-    CPUObjectCount.Total--;
+    m_ObjectCount.Dynamic--;
+    m_ObjectCount.Total--;
 }
 
-void EngineCore::ProcessAddCommand(bool Visible, vector2<float> Velocity, vector2<float> Position, GameObject* Object)
+void EngineCore::ProcessAddCommand(bool Visible, vec2<float> Velocity, vec2<float> Position, GameObject* Object)
 {
     if (Object == nullptr) {
         throw std::runtime_error("BlokkForge: GameObject pointer passed as nullptr");
@@ -70,7 +69,7 @@ void EngineCore::ProcessAddCommand(bool Visible, vector2<float> Velocity, vector
         IsVisible.push_back(Visible);
         #endif
 
-        StaticObjectCount++;
+        m_ObjectCount.Static++;
     } 
     else // If creating a dynamic object
     {
@@ -86,24 +85,24 @@ void EngineCore::ProcessAddCommand(bool Visible, vector2<float> Velocity, vector
         IsVisible.push_back(Visible);
         #endif
 
-        if(StaticObjectCount > 0)
+        if(m_ObjectCount.Static > 0)
         {
             // Swap position with first static member to keep with dynamic object data
-            SwapStaticObjects(DynamicObjectCount, ObjectCount - 1);
+            SwapStaticObjects(m_ObjectCount.Dynamic, m_ObjectCount.Total - 1);
         } 
         else {
             // Add index
-            Object->EngineIdx = DynamicObjectCount;
+            Object->EngineIdx = m_ObjectCount.Dynamic;
         }
 
         // Add velocity
         m_XVelocities.push_back(XVel);
         m_YVelocities.push_back(YVel);
 
-        DynamicObjectCount++;
+        m_ObjectCount.Dynamic++;
     }
 
-    ObjectCount++;
+    m_ObjectCount.Total++;
 }
 
 void EngineCore::ProcessAddCommand(EngineObjectCreationParams Fields) {

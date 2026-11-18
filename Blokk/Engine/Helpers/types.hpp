@@ -1,6 +1,5 @@
 #pragma once
 
-#include <SDL3/SDL.h>
 #include <concepts>
 #include <cstdint>
 #include <iostream>
@@ -9,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include <SDL3/SDL.h>
 #include <glm/glm.hpp>
 
 #ifdef Blokk_Debug_Enabled
@@ -31,47 +31,53 @@ struct range {
 
 struct IndexRange : range<uint32_t> {};
 
-template <typename T>
-struct vector2 {
+template <typename T = float>
+    requires std::integral<T> || std::floating_point<T>
+struct vec2 {
     T x, y;
+
+    // Conversion to glm types
+    operator glm::vec2() const {
+        return glm::vec2(static_cast<float>(x), static_cast<float>(y));
+    }
 
     // operator +
     vector2<T> operator+(T val) {
-        return vector2<T>{x + val, y + val};
+        return vec2<T>{x + val, y + val};
     }
     [[nodiscard]] inline
-    vector2<T> operator+(vector2<T> val) {
-        return vector2<T>{x + val.x, y + val.y};
+    vec2<T> operator+(vec2<T> val) {
+        return vec2<T>{x + val.x, y + val.y};
     }
     
     // operator -
     [[nodiscard]] inline
-    vector2<T> operator-(T val) {
-        return vector2<T>{x - val, y - val};
+    vec2<T> operator-(T val) {
+        return vec2<T>{x - val, y - val};
     }
     [[nodiscard]] inline
-    vector2<T> operator-(vector2<T> val) {
-        return vector2<T>{x - val.x, y - val.y};
+    vec2<T> operator-(vec2<T> val) {
+        return vec2<T>{x - val.x, y - val.y};
     }
 
     // operator *
     [[nodiscard]] inline
-    vector2<T> operator*(T val) {
-        return vector2<T>{x * val, y * val};
+    vec2<T> operator*(T val) {
+        return vec2<T>{x * val, y * val};
     }
     [[nodiscard]] inline
-    vector2<T> operator*(vector2<T> val) {
-        return vector2<T>{x * val.x, y * val.y};
+    vec2<T> operator*(vec2<T> val) {
+        return vec2<T>{x * val.x, y * val.y};
     }
 
     // operator /
     [[nodiscard]] inline
-    vector2<T> operator/(T val) {
-        return vector2<T>{x / val, y / val};
+    vec2<T> operator/(T val) {
+        return vec2<T>{x / val, y / val};
     }
     [[nodiscard]] inline
-    vector2<T> operator/(vector2<T> val) {
-        return vector2<T>{x / val.x, y / val.y};
+    vec2<T> operator/(vec2<T> val) {
+        return vec2<T>{x / val.x, y / val.y};
     }
 
     // operator ==
@@ -80,7 +86,7 @@ struct vector2 {
         return x == val && y == val;
     }
     [[nodiscard]] inline
-    bool operator==(vector2<T> val) {
+    bool operator==(vec2<T> val) {
         return x == val.x && y == val.y;
     }
 
@@ -89,13 +95,13 @@ struct vector2 {
         x += val; 
         y += val;
     }
-    inline void operator+=(vector2<T> val) {
+    inline void operator+=(vec2<T> val) {
         x += val.x;
         y += val.y;
     }
 
     // operator -=
-    inline void operator-=(vector2<T> val) {
+    inline void operator-=(vec2<T> val) {
         x -= val.x;
         y -= val.y;
     }
@@ -109,7 +115,7 @@ struct vector2 {
         x *= val;
         y += val;
     }
-    inline void operator*=(vector2<T> val) {
+    inline void operator*=(vec2<T> val) {
         x *= val.x;
         y *= val.y;
     }
@@ -119,7 +125,7 @@ struct vector2 {
         x /= val;
         y /= val;
     }
-    inline void operator/=(vector2<T> val) {
+    inline void operator/=(vec2<T> val) {
         x /= val.x; 
         y /= val.y;
     }
@@ -127,7 +133,7 @@ struct vector2 {
 };
 
 struct Circle {
-    vector2<float> Center;
+    vec2<float> Center;
     float Radius;
 };
 
@@ -165,16 +171,16 @@ class ObjectAnimations {
 class GameObject;
 
 struct EngineObjectCreationParams {
-    bool visible;
-    vector2<float> velocity;
-    vector2<float> position;
+    bool Visible;
+    vec2<float> Velocity;
+    vec2<float> Position;
     GameObject& Object;
 };
 
 struct ObjectCreationParams {
     bool visible;
-    vector2<float> velocity;
-    vector2<float> position;
+    vec2<float> velocity;
+    vec2<float> position;
 };
 
 struct ConstantFrameData {
