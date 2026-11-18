@@ -27,6 +27,8 @@ target_include_directories(Blokk
 
 target_link_libraries(Blokk
     PRIVATE
+        Vulkan::Vulkan
+        vk-bootstrap
         SDL3::SDL3
         xsimd
         imgui
@@ -38,7 +40,6 @@ target_link_libraries(Blokk
 
 # Shader compiler
 include("${CMAKE_CURRENT_LIST_DIR}/ShaderCompiler.cmake")
-add_dependencies(Blokk CompileShaders)
 
 # SIMD DETECTOR -------------------------------------------------------------
 

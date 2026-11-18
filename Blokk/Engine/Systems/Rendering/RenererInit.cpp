@@ -7,6 +7,8 @@
 #include "../EngineClassData.hpp"
 #include "types.hpp"
 
+#include "Shaders/ShaderBytecodes.h"
+
 namespace Blokk {
 
     Renderer::Renderer(GLFWwindow& p_Window, EngineCore& p_Engine) : 
@@ -630,126 +632,60 @@ namespace Blokk {
 
         return shaderModule;
     }
-
-    void Renderer::LoadAndStoreShaders() 
+        
+    VkShaderModule Renderer::CreateShaderModule(VkDevice device, std::span<const unsigned char> bytecode)
     {
-        // Velocity ----------------------------------------
-
-        auto velocityComputeShaderSource = LoadShaderFile("Velocities.comp.spv");
-        VkShaderModule velocityShaderModule = CreateShaderModule(m_Device, velocityComputeShaderSource);
-
-        // Configure pipeline shader stage
-        VkPipelineShaderStageCreateInfo shaderStageCreationInfo{
-            .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
-            .stage = VK_SHADER_STAGE_COMPUTE_BIT,
-            .module = velocityShaderModule,
-            .pName = "main"
+        VkShaderModuleCreateInfo createInfo{
+            .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+            .codeSize = bytecode.size_bytes(),
+            .pCode = reinterpret_cast<const uint32_t*>(bytecode.data())
         };
 
-        // Set up pipeline create info
-        VkComputePipelineCreateInfo pipelineCreationInfo{
-            .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
-            .stage = shaderStageCreationInfo,
-            .layout = m_PipelineLayout,
-            .basePipelineHandle = VK_NULL_HANDLE,
-            .basePipelineIndex = -1
-        };
-
-        // Create pipeline
-        if (vkCreateComputePipelines(m_Device, VK_NULL_HANDLE, 1, &pipelineCreationInfo, nullptr, &m_VelocitiesPipeline) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to create compute pipeline!");
+        VkShaderModule shaderModule = VK_NULL_HANDLE;
+        if (vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create shader module!");
         }
-
-        // Culling -----------------------------------------------------
-
-        // Load compiled SPIR-V binary for culling shader 
-        auto cullingShaderCode = LoadShaderFile("Culling.comp.spv");
-        VkShaderModule cullingShaderModule = CreateShaderModule(m_Device, cullingShaderCode);
-
-        // Configure pipeline shader stage
-        VkPipelineShaderStageCreateInfo cullingStageInfo{
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-            .stage = VK_SHADER_STAGE_COMPUTE_BIT,
-            .module = cullingShaderModule,
-            .pName = "main"
-        };
-
-        // Set up pipeline create info (reusing m_PipelineLayout!)
-        VkComputePipelineCreateInfo cullingPipelineInfo{
-            .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
-            .stage = cullingStageInfo,
-            .layout = m_PipelineLayout,
-            .basePipelineHandle = VK_NULL_HANDLE,
-            .basePipelineIndex = -1
-        };
-
-        // Create the second compute pipeline
-        if (vkCreateComputePipelines(m_Device, VK_NULL_HANDLE, 1, &cullingPipelineInfo, nullptr, &m_RenderCullingPipeline) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to create render culling compute pipeline!");
-        }
-
-        // Deletion --------------------------------------------------
-
-        // Load compiled SPIR-V binary for deletion shader 
-        auto deletionShaderCode = LoadShaderFile("Deletion.comp.spv");
-        VkShaderModule deletionShaderModule = CreateShaderModule(m_Device, deletionShaderCode);
-
-        // Configure pipeline shader stage
-        VkPipelineShaderStageCreateInfo deletionStageInfo{
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-            .stage = VK_SHADER_STAGE_COMPUTE_BIT,
-            .module = deletionShaderModule,
-            .pName = "main"
-        };
-
-        // Set up pipeline create info (reusing m_PipelineLayout!)
-        VkComputePipelineCreateInfo deletionPipelineInfo{
-            .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
-            .stage = deletionStageInfo,
-            .layout = m_PipelineLayout,
-            .basePipelineHandle = VK_NULL_HANDLE,
-            .basePipelineIndex = -1
-        };
-
-        // Create the second compute pipeline
-        if (vkCreateComputePipelines(m_Device, VK_NULL_HANDLE, 1, &deletionPipelineInfo, nullptr, &m_ObjectDeletionPipeline) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to create object deletion compute pipeline!");
-        }
-
-        // Frame number ------------------------------------------------------
-
-        // Load compiled SPIR-V binary for culling shader 
-        auto frameNumShaderCode = LoadShaderFile("Shaders/.comp.spv");
-        VkShaderModule deletionShaderModule = CreateShaderModule(m_Device, deletionShaderCode);
-
-        // Configure pipeline shader stage
-        VkPipelineShaderStageCreateInfo deletionStageInfo{
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-            .stage = VK_SHADER_STAGE_COMPUTE_BIT,
-            .module = deletionShaderModule,
-            .pName = "main"
-        };
-
-        // Set up pipeline create info (reusing m_PipelineLayout!)
-        VkComputePipelineCreateInfo deletionPipelineInfo{
-            .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
-            .stage = deletionStageInfo,
-            .layout = m_PipelineLayout,
-            .basePipelineHandle = VK_NULL_HANDLE,
-            .basePipelineIndex = -1
-        };
-
-        // Create the second compute pipeline
-        if (vkCreateComputePipelines(m_Device, VK_NULL_HANDLE, 1, &deletionPipelineInfo, nullptr, &m_ObjectDeletionPipeline) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to create object deletion compute pipeline!");
-        }
-
-        // Clean up the shader modules
-        vkDestroyShaderModule(m_Device, cullingShaderModule, nullptr); // Culling
-        vkDestroyShaderModule(m_Device, velocityShaderModule, nullptr); // Velocity
-        vkDestroyShaderModule(m_Device, deletionShaderModule, nullptr); // Deletion
+        return shaderModule;
     }
 
+    VkPipeline Renderer::CreateComputePipeline(std::span<const unsigned char> bytecode)
+    {
+        VkShaderModule shaderModule = CreateShaderModule(m_Device, bytecode);
+
+        VkPipelineShaderStageCreateInfo stageInfo{
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+            .stage = VK_SHADER_STAGE_COMPUTE_BIT,
+            .module = shaderModule,
+            .pName = "main"
+        };
+
+        VkComputePipelineCreateInfo pipelineInfo{
+            .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+            .stage = stageInfo,
+            .layout = m_PipelineLayout,
+            .basePipelineHandle = VK_NULL_HANDLE,
+            .basePipelineIndex = -1
+        };
+
+        VkPipeline pipeline = VK_NULL_HANDLE;
+        VkResult result = vkCreateComputePipelines(m_Device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline);
+
+        // Always destroy the temporary VkShaderModule right after pipeline creation
+        vkDestroyShaderModule(m_Device, shaderModule, nullptr);
+
+        if (result != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create compute pipeline!");
+        }
+        return pipeline;
+    }
+
+    void Renderer::LoadAndStoreShaders()
+    {
+        m_VelocitiesPipeline      = CreateComputePipeline(VelocitiesShader);
+        m_RenderCullingPipeline   = CreateComputePipeline(CullingShader);
+        m_ObjectDeletionPipeline  = CreateComputePipeline(DeletionShader);
+        m_FrameIndexesPipeline    = CreateComputePipeline(FrameIndexesShader); // Replace with your actual member name
+    }
 
     void Renderer::CreateBindlessDescriptorLayout()
     {

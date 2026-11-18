@@ -26,7 +26,7 @@ struct ConstantFrameData {
 // ----------------------------------------------------------
 
 // push_constants optimized for speed when CPU updates (Maximum 120 bytes!)
-[[vk::push_constants]] ConstantFrameData FrameConstants;
+[[vk::push_constant]] ConstantFrameData FrameConstants;
 
 // Positions
 [[vk::binding(0, 0)]] StructuredBuffer<float2> Velocities : register(t0, space0); // Object velocities [Updated by: CPU]
@@ -36,7 +36,7 @@ struct ConstantFrameData {
 [[vk::binding(2, 0)]] StructuredBuffer<uint> AnimationSizes : register(t2, space0); // Number of frames in animations [NOT UPDATED]
 [[vk::binding(3, 0)]] StructuredBuffer<float2> FrameDimensions : register(t3, space0); // Frame height and widths [NOT UPDATED]
 [[vk::binding(4, 0)]] RWStructuredBuffer<uint> FrameNumbers : register(u4, space0); // Frame numbers [Updated by: GPU & CPU]
-[[vk::binding(5, 0)]] RWStructuredBuffer<uint> AnimationNumbers : register(t5, space0); // Object animation index in memory [Updated by: CPU]
+[[vk::binding(5, 0)]] RWStructuredBuffer<uint> AnimationNumbers : register(u5, space0); // Object animation index in memory [Updated by: CPU]
 [[vk::binding(6, 0)]] StructuredBuffer<uint> AnimationStarts : register(t6, space0); // Animation start index in memory [Updated by: CPU]
 
 // Outputs & Rendering 

@@ -9,7 +9,7 @@ struct ConstantFrameData {
     float DeltaTime;
 };
 
-[[vk::push_constants]] ConstantFrameData FrameConstants;
+[[vk::push_constant]] ConstantFrameData FrameConstants;
 [[vk::binding(2, 0)]] StructuredBuffer<uint> AnimationSizes : register(t2, space0); // Number of frames in animations [NOT UPDATED]
 [[vk::binding(4, 0)]] RWStructuredBuffer<uint> FrameNumbers : register(u4, space0); // Frame numbers [Updated by: GPU & CPU]
 [[vk::binding(5, 0)]] StructuredBuffer<uint> AnimationNumbers : register(t5, space0); // Object animation index in memory [Updated by: CPU]

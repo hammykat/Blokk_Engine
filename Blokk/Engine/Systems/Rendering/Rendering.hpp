@@ -1,7 +1,7 @@
 #pragma once
 
 #define VMA_IMPLEMENTATION
-#include <vk_mem_alloc.h>
+#include <vma/vk_mem_alloc.h>
 
 #include <GLFW/glfw3.h>
 #include <VkBootstrap.h>
@@ -10,6 +10,7 @@
 #include <cassert>
 #include <filesystem>
 #include <iostream>
+#include <span>
 #include <span>
 #include <string>
 #include <unordered_map>
@@ -206,7 +207,8 @@ namespace Blokk {
 		void BulkAddDataToGPUBuffers(const BulkObjectCreationData& Data);
 		void BulkDeleteObjects(std::vector<uint32_t>& Indexes);
 
-		std::vector<uint32_t> LoadShaderFile(const std::string& _filePath);
+		VkShaderModule CreateShaderModule(VkDevice device, std::span<const unsigned char> bytecode);
+		VkPipeline CreateComputePipeline(std::span<const unsigned char> bytecode);
 		void LoadAndStoreShaders();
 		void LoadTextures(const std::vector<std::filesystem::path>& filePaths);
 

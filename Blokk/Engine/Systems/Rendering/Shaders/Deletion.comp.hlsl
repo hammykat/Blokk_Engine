@@ -11,10 +11,10 @@ struct ConstantFrameData {
 
 
 // Push Constants
-[[vk::push_constants]] ConstantFrameData FrameConstants;
+[[vk::push_constant]] ConstantFrameData FrameConstants;
 
 // Buffers mapped to contiguous layout (0 to 11)
-[[vk::binding(0, 0)]] RWStructuredBuffer<float2> Velocities : register(t0, space0); // Object velocities
+[[vk::binding(0, 0)]] RWStructuredBuffer<float2> Velocities : register(u0, space0); // Object velocities
 [[vk::binding(1, 0)]] RWStructuredBuffer<float2> Positions : register(u1, space0); // Object positions [Updated by: GPU & CPU]
 [[vk::binding(4, 0)]] RWStructuredBuffer<uint> FrameNumbers : register(u4, space0); // Frame numbers [Updated by: GPU & CPU]
 [[vk::binding(5, 0)]] RWStructuredBuffer<uint> AnimationNumbers : register(u5, space0); // Object animation index in memory [Updated by: CPU]

@@ -221,7 +221,7 @@ namespace Blokk
 
         // GPU pipeline functions --------------------------------------
 
-        void InitializeGPUPipeline(BulkObjectCreationData& Data);
+        void InitializeGPUPipeline(GPUPipelineCreationData& Data);
         void BulkCreateGPUObjects(BulkObjectCreationData& Data);
         void BulkDestroyGPUObjects(const std::vector<uint32_t>& IndexesToDelete);
 

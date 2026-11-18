@@ -7,13 +7,13 @@
 
 namespace Blokk {
 
-	void EngineCore::InitializeGPUPipeline(BulkObjectCreationData& Data) {
-		m_Renderer.CreateAndMapAllBuffers(Data.ObjectCount);
+	void EngineCore::InitializeGPUPipeline(GPUPipelineCreationData& Data) {
+		m_Renderer->CreateAndMapAllBuffers(Data);
 		m_GPUPipelineInitialized = true;
 	}
 
-	void EngineCore::BulkCreateObjects(BulkObjectCreationData& Data) {
-		m_Renderer.BulkAddDataToGPUBuffers(Data);
+	void EngineCore::BulkCreateGPUObjects(BulkObjectCreationData& Data) {
+		m_Renderer->BulkAddDataToGPUBuffers(Data);
 	} 
 
     // Renderer functions --------------------------------------------------------

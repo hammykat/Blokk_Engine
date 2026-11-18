@@ -11,7 +11,7 @@ struct ConstantFrameData {
 };
 
 // Constant Buffer / Push Constants
-[[vk::push_constants]] ConstantFrameData FrameData;
+[[vk::push_constant]] ConstantFrameData FrameData;
 
 // Positions
 [[vk::binding(0, 0)]] StructuredBuffer<float2> Velocities : register(t0, space0); // Object velocities [Updated by: CPU]

@@ -12,9 +12,9 @@ struct ConstantFrameData {
 
 [[vk::push_constant]] ConstantFrameData FrameConstants;
 [[vk::binding(0, 0)]] StructuredBuffer<float2> Velocities : register(t0); // Object velocities [Updated by: CPU]
-[[vk::binding(1, 0)]] RWStructuredBuffer<float2> Positions : register(t1); // Object positions [Updated by: GPU & CPU]
+[[vk::binding(1, 0)]] RWStructuredBuffer<float2> Positions : register(u1); // Object positions [Updated by: GPU & CPU]
 [[vk::binding(2, 0)]] StructuredBuffer<uint> AnimationSizes : register(t2); // Number of frames in animations [NOT UPDATED]
-[[vk::binding(4, 0)]] RWStructuredBuffer<uint> FrameNumbers : register(t4); // Frame numbers [Updated by: GPU & CPU]
+[[vk::binding(4, 0)]] RWStructuredBuffer<uint> FrameNumbers : register(u4); // Frame numbers [Updated by: GPU & CPU]
 
 [numthreads(256, 1, 1)]
 void main(uint3 _id : SV_DispatchThreadID) {
