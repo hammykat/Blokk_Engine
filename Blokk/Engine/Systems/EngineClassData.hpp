@@ -356,6 +356,7 @@ namespace Blokk
         // For updating GPU object data after the start
         Renderer* m_Renderer;
         bool m_GPUPipelineInitialized;
+        bool m_CallGPUProcess;
 
         // GPU object data (only taken at start)
         std::vector<glm::vec2> m_StartingVelocities; // The velocities of each object
@@ -486,6 +487,6 @@ namespace Blokk
         void GetAverageUpdateTimes();
         void Remove_Function(uint32_t idx);
         
-        void LoadEngine(uint32_t Threading_NumberOfTests, Renderer* p_Renderer = nullptr)
+        void LoadEngine(uint32_t Threading_NumberOfTests, Renderer* p_Renderer = nullptr);
     };
 }

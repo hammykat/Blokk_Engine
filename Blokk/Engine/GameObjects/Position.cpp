@@ -4,22 +4,22 @@
 namespace Blokk { 
  
 // Set 
-void GameObject::SetPosition(float TargetX, float TargetY)  
+void GameObject::SetPosition(float TargetX, float TargetY) const
 { 
     // Update X and Y 
     Engine->m_XPositions[EngineIdx] = TargetX;
     Engine->m_YPositions[EngineIdx] = TargetY;
 } 
 
-void GameObject::SetPosition(vec2<float> TargetPos) {
+void GameObject::SetPosition(vec2<float> TargetPos) const {
     SetPosition(TargetPos.x, TargetPos.y); 
 } 
  
-void GameObject::SetXPosition(float Target) { 
+void GameObject::SetXPosition(float Target) const { 
     Engine->m_XPositions[EngineIdx] = Target;
 } 
 
-void GameObject::SetYPosition(float Target) { 
+void GameObject::SetYPosition(float Target) const { 
     Engine->m_YPositions[EngineIdx] = Target;
 } 
  
@@ -33,21 +33,21 @@ vec2<float> GameObject::GetPosition()
 } 
  
 // Change 
-void GameObject::ChangePosition(float ChangeX, float ChangeY)  
+void GameObject::ChangePosition(float ChangeX, float ChangeY) const 
 { 
     Engine->m_XPositions[EngineIdx] += ChangeX;
     Engine->m_YPositions[EngineIdx] += ChangeY;
 } 
 
-void GameObject::ChangePosition(vec2<float> Change) { 
+void GameObject::ChangePosition(vec2<float> Change) const { 
     ChangePosition(Change.x, Change.y); 
 } 
  
-void GameObject::ChangeXPosition(float X) { 
+void GameObject::ChangeXPosition(float X) const { 
     Engine->m_XPositions[EngineIdx] += X;
 } 
 
-void GameObject::ChangeYPosition(float Y) { 
+void GameObject::ChangeYPosition(float Y) const { 
     Engine->m_YPositions[EngineIdx] += Y;
 } 
  

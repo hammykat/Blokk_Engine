@@ -62,7 +62,6 @@ void GameObject::SetToStatic()
     Engine->m_YVelocities.pop_back(); 
 
     // Update engine vars
-    Engine->m_ObjectCount.Total++;
     Engine->m_ObjectCount.Dynamic--;
     Engine->m_ObjectCount.Static++;
 }
@@ -81,7 +80,6 @@ void GameObject::SetToDynamic(vec2<float> Vel)
     Engine->m_YVelocities.push_back(Vel.y);
 
     // Update engine vars
-    Engine->m_ObjectCount.Total++;
     Engine->m_ObjectCount.Dynamic++;
     Engine->m_ObjectCount.Static--;
 }

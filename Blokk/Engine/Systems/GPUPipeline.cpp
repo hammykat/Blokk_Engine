@@ -7,9 +7,16 @@
 
 namespace Blokk {
 
-	void EngineCore::InitializeGPUPipeline(GPUPipelineCreationData& Data) {
+	void EngineCore::InitializeGPUPipeline(GPUPipelineCreationData& Data) 
+    {
+        // Make sure renderer is initialized
+        if (m_Renderer == nullptr) {
+            throw std::runtime_error("Renderer not set before calling EngineCore::InitializeGPUPipeline()");
+        }
+
 		m_Renderer->CreateAndMapAllBuffers(Data);
 		m_GPUPipelineInitialized = true;
+        m_CallGPUProcess = Data.CalledByEngineEveryFrame;
 	}
 
 	void EngineCore::BulkCreateGPUObjects(BulkObjectCreationData& Data) {
@@ -82,8 +89,8 @@ namespace Blokk {
         // Send the data to the GPU buffer to be used
         auto region = CreateBufferCopyRegion(0, 0, firstGroup.size() * sizeof(uint32_t));
         auto countRegion = CreateBufferCopyRegion(0, 0, sizeof(uint32_t));
-        vkCmdCopyBuffer(m_CommandBuffer, m_DeletionStagingBuffer, m_IndexesToDeleteBuffer, 1, &region);
-        vkCmdCopyBuffer(m_CommandBuffer, m_DeletionStagingBuffer, m_IndexesToDeleteBuffer, 1, &region);
+        vkCmdCopyBuffer(m_CommandBuffer, m_DeletionStagingBuffer.buffer, m_IndexesToDeleteBuffer.buffer, 1, &region);
+        vkCmdCopyBuffer(m_CommandBuffer, m_DeletionStagingBuffer.buffer, m_IndexesToDeleteBuffer.buffer, 1, &region);
         CmdTransferToComputeBarrier(); // Add a barrier to prevent memory bugs
 
         vkCmdBindPipeline(m_CommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_ObjectDeletionPipeline);
@@ -106,7 +113,7 @@ namespace Blokk {
 
         // Send the data to the GPU buffer to be used
         region = CreateBufferCopyRegion(0, 0, secondGroup.size() * sizeof(uint32_t));
-        vkCmdCopyBuffer(m_CommandBuffer, m_DeletionStagingBuffer, m_IndexesToDeleteBuffer, 1, &region);
+        vkCmdCopyBuffer(m_CommandBuffer, m_DeletionStagingBuffer.buffer, m_IndexesToDeleteBuffer.buffer, 1, &region);
         CmdTransferToComputeBarrier(); // Add a barrier to prevent memory bugs
 
         vkCmdBindPipeline(m_CommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_ObjectDeletionPipeline);

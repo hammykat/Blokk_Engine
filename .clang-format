@@ -1,3 +1,31 @@
----
-DisableFormat: true
----
+BasedOnStyle: LLVM
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+
+# --- Braces ---
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterClass: false
+  AfterStruct: false
+  AfterNamespace: true
+  AfterFunction: true
+  AfterControlStatement: Never
+  BeforeElse: false
+
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+
+# --- Attributes ([[nodiscard]] and inline placement) ---
+BreakAfterAttributes: Leave
+
+# --- Indenting & Spacing ---
+AccessModifierOffset: -4
+SpaceAfterCStyleCast: false
+SpaceBeforeParens: ControlStatements
+PointerAlignment: Left
+
+# --- Includes & Cleanup ---
+SortIncludes: CaseSensitive
+InsertNewlineAtEOF: true

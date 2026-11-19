@@ -126,7 +126,7 @@ void GameObject::SetVelocityY(float YVel)
 }
 
 // Get
-vec2<float> GameObject::GetVelocity() 
+vec2<float> GameObject::GetVelocity() const
 {
     // If the object is static
     if(IsStatic)
@@ -144,7 +144,7 @@ vec2<float> GameObject::GetVelocity()
     }
 }
 
-float GameObject::GetVelocityX() 
+float GameObject::GetVelocityX() const 
 {
     // If the object is static
     if(IsStatic)
@@ -158,7 +158,7 @@ float GameObject::GetVelocityX()
     }
 }
 
-float GameObject::GetVelocityY() 
+float GameObject::GetVelocityY() const 
 {
     // If the object is static
     if(IsStatic)
@@ -173,7 +173,7 @@ float GameObject::GetVelocityY()
 }
 
 // Get the speed
-float GameObject::GetSpeed() 
+float GameObject::GetSpeed() const
 {
     // If static return 0, not moving
     if(IsStatic) return 0;
@@ -184,7 +184,7 @@ float GameObject::GetSpeed()
     return sqrt(XVel * XVel + YVel * YVel);
 }
 
-float GameObject::GetSpeedSquared() 
+float GameObject::GetSpeedSquared() const 
 {
     // If static return 0, not moving
     if(IsStatic) return 0;
@@ -196,13 +196,13 @@ float GameObject::GetSpeedSquared()
 }
 
 // If not moving, vel != 0
-bool GameObject::IsMoving() 
+bool GameObject::IsMoving() const
 {
     return !IsStatic;
 }
 
 // Stop, set to 0
-void GameObject::StopVelocity() 
+void GameObject::StopVelocity() const
 {
     // Remove its idx if present
     if(IsStatic)
@@ -217,7 +217,7 @@ void GameObject::StopVelocity()
 }
 
 // Reverse
-void GameObject::ReverseVelocity() 
+void GameObject::ReverseVelocity() const
 {
     // If static do nothing
     if(IsStatic) return;
@@ -227,7 +227,7 @@ void GameObject::ReverseVelocity()
     Engine->m_YVelocities[EngineIdx] *= -1;
 }
 
-void GameObject::ReverseVelocityX() 
+void GameObject::ReverseVelocityX() const
 {
     // If static do nothing
     if(IsStatic) return;
@@ -236,7 +236,7 @@ void GameObject::ReverseVelocityX()
     Engine->m_XVelocities[EngineIdx] *= -1;
 }
 
-void GameObject::ReverseVelocityY() 
+void GameObject::ReverseVelocityY() const
 {
     // If static do nothing
     if(IsStatic) return;
@@ -317,7 +317,7 @@ void GameObject::AddVelocity(vec2<float> Vel)
 
 // Divide -----------------------------------------------------
 
-void GameObject::DivideVelocity(float XVel, float YVel) 
+void GameObject::DivideVelocity(float XVel, float YVel) const
 {
     // Avoid bugs with dividing by 0
     if(XVel == 0 || YVel == 0 || IsStatic) return;
@@ -327,17 +327,17 @@ void GameObject::DivideVelocity(float XVel, float YVel)
     Engine->m_YVelocities[EngineIdx] /= YVel;
 }
 
-void GameObject::DivideVelocity(vec2<float> Vel) 
+void GameObject::DivideVelocity(vec2<float> Vel) const
 {
     DivideVelocity(Vel.x, Vel.y);
 }
 
-void GameObject::DivideVelocityX(float Vel) 
+void GameObject::DivideVelocityX(float Vel) const
 {
     DivideVelocity(Vel, 1);
 }
 
-void GameObject::DivideVelocityY(float Vel) 
+void GameObject::DivideVelocityY(float Vel) const 
 {
     DivideVelocity(1, Vel);
 }

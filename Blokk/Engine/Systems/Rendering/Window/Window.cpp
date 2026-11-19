@@ -49,22 +49,17 @@ namespace Blokk {
     // Returns if the window should be closed
     bool Window::ShouldClose() {
         // Initialize, if fails, throw an error
-        assert(init() && "Blokk: GLFW Initialization failed, but tried to run function");
+        assert(Init() && "Blokk: GLFW Initialization failed, but tried to run function");
 
         // Get value from GLFW
         return glfwWindowShouldClose(m_Window);
     }
 
-    // Clear the screen
-    void Window::Clear(Color c) {
-        glClearColor(c.r, c.g, c.b, c.a);
-        glClear(GL_COLOR_BUFFER_BIT);
-    }
-
 
     // Updates the window by rendering and polling events
+    // TODO: Allow user to handle the events and do stuff with them
     void Window::Update() {
-        assert(m_Initialized && !m_InitFailed && "Blokk: Cannot update an uninitialized window!");
+        assert(m_Initialized && !m_InitFailed && "Blokk Error: Cannot update an uninitialized window!");
         glfwSwapBuffers(m_Window); // Flipped drawing onto the screen
         glfwPollEvents(); // Checks for keys, dragging, and resizing
     }
@@ -114,7 +109,7 @@ namespace Blokk {
     // Get the dimensions of the window
     glm::vec2 Window::GetDimensions() {
         assert(m_Window != nullptr && "Blokk: Window is not correctly initialized before using Window::getDimensions");
-        glm::ivec2 dimensions;
+        glm::ivec2 dimensions{};
         glfwGetWindowSize(m_Window, &dimensions.x, &dimensions.y);
         return dimensions;
     }
@@ -122,7 +117,7 @@ namespace Blokk {
     // Get the aspect ratio (width/height)
     float Window::GetAspectRatio() {
         assert(m_Window != nullptr && "Blokk: Window is not correctly initialized before using Window::getAspectRatio");
-        glm::vec2 dimensions = getDimensions();
+        glm::vec2 dimensions = GetDimensions();
         return static_cast<float>(dimensions.x) / static_cast<float>(dimensions.y);
     }
 

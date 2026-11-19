@@ -49,17 +49,17 @@ public:
     void SetVelocityX(float XVel);
     void SetVelocityY(float YVel);
 
-    vec2<float> GetVelocity();
-    float GetVelocityX();
-    float GetVelocityY();
-    float GetSpeed();
-    float GetSpeedSquared();
-    bool IsMoving();
-    void StopVelocity();
+    vec2<float> GetVelocity() const;
+    float GetVelocityX() const;
+    float GetVelocityY() const;
+    float GetSpeed() const;
+    float GetSpeedSquared() const;
+    bool IsMoving() const;
+    void StopVelocity() const;
 
-    void ReverseVelocity();
-    void ReverseVelocityX();
-    void ReverseVelocityY();
+    void ReverseVelocity() const;
+    void ReverseVelocityX() const;
+    void ReverseVelocityY() const;
 
     void MultiplyVelocity(float FactorX, float FactorY);
     void MultiplyVelocity(vec2<float> Factor);
@@ -71,24 +71,24 @@ public:
     void AddVelocity(float XVel, float YVel);
     void AddVelocity(vec2<float> Vel);
 
-    void DivideVelocity(float XVel, float YVel);
-    void DivideVelocity(vec2<float> Vel);
-    void DivideVelocityX(float Vel);
-    void DivideVelocityY(float Vel);
+    void DivideVelocity(float XVel, float YVel) const;
+    void DivideVelocity(vec2<float> Vel) const;
+    void DivideVelocityX(float Vel) const;
+    void DivideVelocityY(float Vel) const;
 
     // Set position
-    void SetPosition(float TargetX, float TargetY);
-    void SetPosition(vec2<float> TargetPos);
-    void SetXPosition(float Target);
-    void SetYPosition(float Target);
+    void SetPosition(float TargetX, float TargetY) const;
+    void SetPosition(vec2<float> TargetPos) const;
+    void SetXPosition(float Target) const;
+    void SetYPosition(float Target) const;
 
     vec2<float> GetPosition();
 
     // Change position
-    void ChangePosition(vec2<float> Change);
-    void ChangePosition(float ChangeX, float ChangeY);
-    void ChangeXPosition(float X);
-    void ChangeYPosition(float Y);
+    void ChangePosition(vec2<float> Change) const;
+    void ChangePosition(float ChangeX, float ChangeY) const;
+    void ChangeXPosition(float X) const;
+    void ChangeYPosition(float Y) const;
 
     // Visibility
     void Hide();
@@ -113,5 +113,6 @@ protected:
 
 };
 
-};
+}; // namespace Blokk
+
 

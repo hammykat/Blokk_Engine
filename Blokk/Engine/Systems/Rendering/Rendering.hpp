@@ -237,7 +237,6 @@ namespace Blokk {
 
 		void RunComputeShaders();
 		inline void DestroyBuffer(AllocatedBuffer buffer) const;
-		inline void ExecuteFrame();
 
 	public:
 		friend class EngineCore;
@@ -246,15 +245,10 @@ namespace Blokk {
 		~Renderer();
 
 		void DrawFrame();
+		void ExecuteFrame();
 		void LoadAnimation(const std::vector<std::filesystem::path>& paths, const std::string& name);
 
 		void SetWindow(Window& Window);
-
-		void RenderObjects();
-		void SetClearColor();
-
-		void ClearScreen();
-		void Present();
 	};
 
 }

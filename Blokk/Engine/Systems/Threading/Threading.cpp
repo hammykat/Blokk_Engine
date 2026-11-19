@@ -215,8 +215,8 @@ double EngineCore::TimeCPUEngineProcesses()
 
 double EngineCore::TimeGPUEngineProcesses()
 {
-    if (m_Renderer != nullptr) {
-        m_Renderer->RenderObjects();
+    if (m_Renderer != nullptr && m_CallGPUProcess) {
+        m_Renderer->ExecuteFrame();
     }
 
     // Nothing happened

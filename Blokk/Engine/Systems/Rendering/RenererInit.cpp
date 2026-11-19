@@ -15,7 +15,7 @@ namespace Blokk {
         m_Window(p_Window), 
         m_Engine(p_Engine) 
     {
-        auto counts = m_Engine.GPUObjectCounts;
+        auto counts = m_Engine.GPUObjectCount;
         m_GPU_ObjectCount = {counts.Total, counts.Dynamic, counts.Static};
         init_vulkan(&p_Window);
     }

@@ -42,7 +42,7 @@ struct vec2 {
     }
 
     // operator +
-    vector2<T> operator+(T val) {
+    vec2<T> operator+(T val) {
         return vec2<T>{x + val, y + val};
     }
     [[nodiscard]] inline
@@ -184,10 +184,10 @@ struct ObjectCreationParams {
 };
 
 struct ConstantFrameData {
-    int32_t objectCounts[3]; // Total, Static, Dynamic
-    glm::vec2 cameraPosition;
-    glm::vec2 screenDimensions;
-    float deltaTime;
+    uint32_t ObjectCount;
+    glm::vec2 CameraPosition;
+    glm::vec2 ScreenDimensions;
+    float DeltaTime;
 };
 
 struct BulkObjectCreationData
