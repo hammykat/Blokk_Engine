@@ -1,5 +1,22 @@
 # The Background Engine Architecture
 
+- [GPU Pipeline](#gpu-pipeline)
+  - [Vulkan Backend](#vulkan-backend)
+  - [GPU Parallelism](#gpu-parallelism)
+  - [Limitations](#limitations)
+  - [Shaders](#shaders)
+- [CPU Pipeline](#cpu-pipeline)
+  - [Parallelism](#parallelism)
+    - [Adaptive Timing](#adaptive-timing)
+    - [Fixed Thread Count](#fixed-thread-count)
+  - [CPU Object Update Functions](#cpu-object-update-functions)
+  - [SIMD](#simd)
+    - [SIMD Fallback](#simd-fallback)
+- [Data Layout](#data-layout)
+  - [Dynamic and Static Objects](#dynamic-and-static-objects)
+- [Animation Data](#animation-data)
+- [Overall Architecture](#overall-architecture)
+
 The Blokk engine is the part of the engine responsible for managing and processing `GameObject` data every frame.
 
 It is designed to process large numbers of objects efficiently by combining:
@@ -21,6 +38,66 @@ Visibility and culling systems can be configured depending on the needs of the a
 
 ---
 
+# GPU Pipeline
+
+The GPU pipeline is faster than the CPU pipeline. It has the capability to handle massive batches of objects but has important limitations.
+
+## Vulkan Backend
+
+The engine uses Vulkan as the backend library with some helper libraries:
+* **vk-bootstrap**: Reduces thousands of lines of initialization code to ~40
+* **VMA**: Handles memory management 
+* **volk**: Dynamically loads Vulkan function pointers directly from the GPU driver, bypassing loader overhead
+
+The engine uses **HLSL** (High Level Shader Language) for the shaders. 
+
+---
+
+## GPU Parallelism 
+
+The engine uses parallelism while using compute shaders. **It is hardcoded to 256 threads for the `numthreads` and dispatches according to the number of objects it needs to update. 
+
+Compute shaders use a hardcoded workgroup size of `[numthreads(256, 1, 1)]` and dispatch `ceil(objectCount / 256)` thread groups. This meets standard Vulkan hardware limits and works across virtually all modern GPUs.
+
+## Limitations 
+
+The GPU pipeline, because it is updated by compute shaders, has limitations. 
+
+### 1) Objects can't be updated
+
+Other than giving the engine large batches of data and deleting objects, the objects submitted to the GPU can't be accessed by the engine. This means that, once you submit objects, you can't retrieve their data later.
+
+The only thing you can do is add large batches and delete objects scattered everywhere.
+
+### 2) Data transfer is slow
+
+The GPU pipeline is designed to allow the user to submit large batches of objects and efficiently handle those large batches. **It was not designed to handle hundreds of indivudal batches**, which will tank your frame rate.
+
+The reason it can't it because it has to update states, run shaders, submit data to GPU memory, etc. These processes are not too bad if used once but will be very costly to performance if done too many times.
+
+This is why it's much, much better to submit a large batch of data at once instead of individual batches for performance and also because the engine was designed that way.
+
+### 3) Objects are simple
+
+Because the objects are updated by the GPU, objects:
+* Can't run any functions **including update functions**
+* Data can't be seen by the main CPU engine, so can't be updated by the user
+* Engine can't take adaptive measures to better handle the load of objects, even though the GPU pipeline is much faster in theory
+
+---
+
+## Shaders
+
+The engine uses compute shaders under the hood to process data in parallel. There are multiple shaders, each with a unique job. For example, one shader handles velocities and incrementing frame numbers, while other shaders handle culling objects.
+
+The engine tries to keep the shader count low, because invoking a shader can have a cost. This is why a shader can have multiple jobs. 
+
+Shaders all have safety mechanisms to prevent memory issues. Shaders are also optimized for efficient memory usage and also simplicity. 
+
+The engine, instead of loading .spv files at runtime, converts the .hlsl files into c-style `const char*` arrays at compile time. The rendering engine that handles the compute shaders then includes these files. The reason the engine does this is because now, the engine can be a standalone executable file, and the user doesn't have to go into folders or deal with extra files. The engine executable would have ot be run form within the directory if it loaded .spv files at runtime, but now it's only one file and the user can just click on it or put it wherever they would like to use it!
+
+# CPU Pipeline
+
 ## Parallelism
 
 Blokk uses multiple worker threads to parallelize engine processing.
@@ -28,6 +105,8 @@ Blokk uses multiple worker threads to parallelize engine processing.
 When the engine starts, it determines the available CPU resources and initializes its worker threads. These threads remain active throughout the lifetime of the engine rather than being repeatedly created and destroyed during individual frames.
 
 This avoids the overhead associated with repeatedly creating and destroying operating-system threads.
+
+---
 
 ### Adaptive Timing
 
@@ -84,7 +163,19 @@ The primary difference is that the engine does not dynamically determine the wor
 
 ---
 
-# SIMD
+## CPU Object Update Functions
+
+CPU Objects have update functions, which are functions called by the engine every frame. The user can override these functions and the engine will call them every frame. These can contain complex logic, change the object's data or much more. You can even do calculations with them if you want!
+The function signature is:
+```cpp
+void GameObject::_Update(double delta) {}
+```
+
+The engine first, inside the loading functions in parallel, times every GameObject update function and store it, and also stores the total amount of time for the frame. The engine basically just runs th egame and adapts to it first. 
+
+If the total time is greater than the time it needs to take, the engine will stop calling certain functions with a lower priority until the time taken is enough to fit inside the time.
+
+## SIMD
 
 Blokk uses **SIMD (Single Instruction, Multiple Data)** to perform the same operation on multiple values simultaneously.
 
@@ -111,11 +202,13 @@ Likewise:
 
 The exact number of objects processed per SIMD operation depends on the implementation and the data being processed. These values represent the number of 32-bit floating-point values that can fit in a register, not necessarily the number of complete objects processed by every operation.
 
+---
+
 ### SIMD Fallback
 
 SIMD is an optimization rather than a requirement.
 
-Blokk detects the available SIMD capabilities of the target architecture and selects an appropriate implementation.
+Blokk detects the available SIMD capabilities of the target architecture at runtime and selects an appropriate implementation. When compiling, the engine will also check if the compiler supports the SIMD type.
 
 When a supported SIMD implementation is unavailable, Blokk can use a **scalar implementation** instead.
 
@@ -214,20 +307,9 @@ Blokk also maintains references to the corresponding `GameObject` instances so t
 
 # Animation Data
 
-Animation data is also stored separately rather than keeping all animation-related information inside each object's class instance.
+The object's animation data is loaded through the renderer and stored in GPU memory. Since all rendering is done in GPU memory, the engine doesn't need to store anything to it. Every object has an index to their current animation frame, and they render using `vkCmdDrawIndirect`.
 
-Depending on the animation data being used, Blokk maintains separate collections for information such as:
-
-* Current animation
-* Current frame
-* Animation names
-* Animation frames
-* Frame dimensions
-* Animation frame counts
-
-Separating these values allows engine systems to access the data they need without loading unrelated object data into the CPU cache.
-
-This also provides a more suitable layout for processing animation data across many objects.
+Not storing the animation data in the CPU allows for less memory used and no redundant data accessed.
 
 ---
 
@@ -237,28 +319,22 @@ The combination of **SoA data storage, persistent worker threads, workload-based
 
 Conceptually:
 
-```text
-                     Blokk Engine
-                          │
-             ┌────────────┴────────────┐
-             │                         │
-       Data-Oriented Storage      GameObject API
-             │                         │
-             │                   User Interface
-             │
-       ┌─────┴─────┐
-       │           │
-   Worker Threads  SIMD
-       │           │
-       └─────┬─────┘
-             │
-       Engine Systems
-             │
-    ┌────────┼─────────┐
-    │        │         │
- Movement  Animation  Visibility
-                       │
-                  Rendering/Culling
+```mermaid
+%%{init: {'flowchart': {'curve': 'linear'}}}%%
+flowchart TD
+    Engine[Blokk Engine] --> EngineCore[Engine Core]
+    EngineCore --> CPUPipeline[Multithreading and SIMD pipeline]
+    CPUPipeline --> Storage
+    GPUPipeline --> Shaders[Shaders]
+    GPUPipeline --> SSBOs[Storage Buffers]
+
+    Engine --> ObjectHandle[GameObject Handle]
+    ObjectHandle --> Storage
+
+    EngineCore --> Storage[Data-Oriented SoA Storage]
+
+    Engine --> Renderer[Renderer]
+    Renderer --> GPUPipeline[GPU Object Pipeline]
 ```
 
-Blokk's architecture is designed so that the user can work with familiar `GameObject` instances while the engine internally uses data-oriented techniques to improve processing efficiency.
+

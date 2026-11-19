@@ -12,8 +12,9 @@ Blokk is designed around:
 * **High Performance** — Uses techniques such as SIMD, Structure of Arrays (SoA), cache-friendly data layouts, and parallel processing.
 * **Adaptive Threading** — The engine can automatically adjust its worker-thread usage based on execution time.
 * **2D Focused** — Built specifically around 2D game development rather than trying to cover every type of game.
-* **C++** — Full access to C++ and the underlying engine.
-* **SDL3 Rendering** — Uses SDL3 for rendering and SDL_image for loading image assets.
+* **C++** — C++ scripting and full access to the underlying engine.
+* **Vulkan Rendering** — Uses Vulkan for rendering and stb_image_image for loading image assets.
+* **Compute Shaders** - Utilizes compute shaders for large numbers of simple objects.
 * **Lightweight** — Designed to keep the engine's core systems relatively small and focused.
 * **Open Source** — Anyone can inspect the source code, learn from it, contribute improvements, or experiment with the architecture.
 
@@ -43,7 +44,7 @@ For more information about the engine's architecture, see the [engine architectu
 
 ## Rendering
 
-Blokk currently uses **SDL3** as its rendering backend, with **SDL_image** for loading image assets.
+Blokk currently uses **Vulkan** as its rendering backend, with **stb_image** for loading image assets.
 
 The rendering system supports:
 
@@ -53,7 +54,6 @@ The rendering system supports:
 * Rendering visible objects
 * Camera-relative rendering
 * Rendering diagnostics
-* Optional rendering through `Blokk_Rendering_Enabled`
 
 Rendering is designed to remain separate from the engine's core object-processing systems where possible.
 

@@ -337,41 +337,27 @@ before including Blokk:
 
 ---
 
-## Initializing
+## Window
 
-Initialize the SDL systems your game needs with `Blokk::Init()`:
-
+Initialize the window, then call the `Init()` function.
 ```cpp
-Blokk::Init(
-    Blokk::InitFlags::Video |
-    Blokk::InitFlags::Events
-);
+Window myWindow;
+myWindow.Init();
 ```
 
-Multiple flags can be combined using `|`.
-
-Available initialization flags:
-
-| Flag       | Purpose                  |
-| ---------- | ------------------------ |
-| `Video`    | Video and window support |
-| `Audio`    | Audio support            |
-| `Joystick` | Joystick support         |
-| `Haptic`   | Haptic feedback          |
-| `Gamepad`  | Gamepad support          |
-| `Events`   | Event handling           |
-| `Sensor`   | Sensor support           |
-
-For a normal game, you will usually want:
-
-```cpp
-Blokk::Init(
-    Blokk::InitFlags::Video |
-    Blokk::InitFlags::Events
-);
-```
-
----
+Here are the functions that you can run:
+| Function | Use
+|----------|-----
+| `void SetTitle(const char* title)` | Set the window's title 
+| `void Maximize()` | Maximize the window
+| `void Minimize()` | Minimize the window
+| `void Restore()` | Restores the window from being maximized or minimized
+| `void Update()` | Updates the window
+| `uint32_t GetWidth()` | Gets the width of the window
+| `uint32_t GetHeight()` | Gets the height of the window
+| `glm::vec2 GetDimensions()` | Gets the dimensions of the window
+| `float GetAspectRatio()` | Gets the aspect ratio 
+| `GLFWwindow* GetNativeWindow()` | Gets a pointer to the GLFW window
 
 ## Creating an EngineCore
 
@@ -385,50 +371,6 @@ Blokk::ManagerCreation CreationParams{
 
 Blokk::EngineCore MyManager(CreationParams);
 ```
-
----
-
-## Creating a Window
-
-Use `Blokk::CreateWindow()` to create a window:
-
-```cpp
-Blokk::CreateWindow(
-    "My Game",
-    1280,
-    720
-);
-```
-
-You can also provide `WindowFlags`:
-
-```cpp
-Blokk::CreateWindow(
-    "My Game",
-    1280,
-    720,
-    Blokk::WindowFlags::Resizable
-);
-```
-
-Multiple flags can be combined using `|`:
-
-```cpp
-Blokk::WindowFlags::Resizable |
-Blokk::WindowFlags::HighDPI
-```
-
-Available window flags:
-
-| Flag         | Purpose                         |
-| ------------ | ------------------------------- |
-| `Fullscreen` | Creates a fullscreen window     |
-| `Resizable`  | Allows the window to be resized |
-| `Borderless` | Removes the window border       |
-| `Hidden`     | Creates the window hidden       |
-| `Maximized`  | Creates the window maximized    |
-| `Minimized`  | Creates the window minimized    |
-| `HighDPI`    | Enables high-DPI support        |
 
 ---
 
@@ -590,7 +532,7 @@ Renderer.AddFrameToAnimation(
 
 # Using Blokk Without Built-In Rendering
 
-Blokk's rendering system is optional.
+Blokk's rendering system is optional. If you don't want to use it, simply don't initialize it (though you can't create GPU objects without the renderer or manage GPU things)
 
 If you are using another graphics or game framework, you can use Blokk to manage your object data and engine systems while handling rendering yourself.
 
@@ -608,13 +550,11 @@ Your Game
    └── Your renderer
 ```
 
-To disable Blokk's built-in renderer, simply do not define:
+To disable Blokk's built-in renderer, you can either:
+* **Initialize but don't use**: You can use it for any reason but set `CalledByEngineEveryFrame` to false when creating the GPU pipeline in the engine in the `GPUPipelineCreation` struct. 
+* **Don't initialize at all**: By not initializing, the engine won't try to use it. Though make sure not to use GPU pipeline or renderer related functions, because they will throw and error!
 
-```cpp
-#define Blokk_Rendering_Enabled
-```
-
-This allows Blokk to handle the engine systems while your own renderer decides how objects are displayed.
+This allows Blokk to handle the engine systems while your own renderer decides how objects are displayed. Though, because Blokk's renderer is optimized to be able to renderer hundreds of thousands of textures, the built-in renderer will be more than enough for 99.9% of games.
 
 ---
 

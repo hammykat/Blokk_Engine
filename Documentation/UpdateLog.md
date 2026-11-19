@@ -1,6 +1,11 @@
 # v0.1.9
 > not completed yet
 
+### New Features
+* GPU Object Pipeline (With compute shaders)
+* Sounds (OpenAL)
+* New rendering backend (implemented in Vulkan)
+
 ### Fixes
 * Made `SetTargetExecutionTime(double)` public inside the `EngineCore` class instead of inside the `Diagnostics` class
 * Implemented `SetThreadCount(uint32_t)` - was declared but not defined
