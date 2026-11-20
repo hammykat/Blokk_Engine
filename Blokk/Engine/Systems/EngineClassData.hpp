@@ -362,7 +362,7 @@ namespace Blokk
         std::vector<glm::vec2> m_StartingVelocities; // The velocities of each object
         std::vector<glm::vec2> m_StartingPositions; // The positions of each object
         std::vector<uint32_t> m_StartingFrameNumbers; // The frame numbers of each object
-        std::vector<uint32_t> StartingAnimationNumbers; // The animation numbers of each object (Stored as indexes to animation array)
+        std::vector<uint32_t> m_StartingAnimationNumbers; // The animation numbers of each object (Stored as indexes to animation array)
 
         // CPU object data 
 

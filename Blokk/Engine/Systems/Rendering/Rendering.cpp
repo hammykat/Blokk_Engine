@@ -1,15 +1,28 @@
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
+// 1. Load Volk FIRST so Vulkan types and VK_NO_PROTOTYPES are defined for VMA, GLFW, and vk-bootstrap
+#include <Volk/volk.h>
 
+// 2. VMA (configured for dynamic Vulkan functions via volk)
+#define VMA_STATIC_VULKAN_FUNCTIONS 0
+#define VMA_DYNAMIC_VULKAN_FUNCTIONS 1
 #define VMA_IMPLEMENTATION
 #include <vma/vk_mem_alloc.h>
 
+// 3. Windowing & Vulkan helpers (now see VK_VERSION_1_0 from volk.h)
 #include <GLFW/glfw3.h>
 #include <VkBootstrap.h>
 
-// GLM 
+// 4. Third-party single-header & math libraries
+#define STB_IMAGE_IMPLEMENTATION
+#include "../stb_image.h"
 #include <glm/glm.hpp>
 
+// 5. Project headers
+#include "Rendering.hpp"
+#include "Window/Window.hpp"
+#include "../EngineClassData.hpp"
+#include "types.hpp"
+
+// 6. C++ Standard Library
 #include <cassert>
 #include <filesystem>
 #include <format>
@@ -17,12 +30,6 @@
 #include <span>
 #include <string>
 #include <vector>
-
-#include "Rendering.hpp"
-#include "types.hpp"
-
-#include "../EngineClassData.hpp"
-#include "Window/Window.hpp"
 
 namespace Blokk 
 {

@@ -77,6 +77,24 @@ namespace Blokk {
 			INDIRECT_BUFFER = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT
 		};
 
+		[[nodiscard]] friend inline constexpr 
+		UsageFlags operator|(UsageFlags p_lhs, UsageFlags p_rhs)
+        {
+            return static_cast<UsageFlags>(
+                static_cast<VkBufferUsageFlags>(p_lhs) |
+                static_cast<VkBufferUsageFlags>(p_rhs));
+        }
+
+		[[nodiscard]] constexpr VmaMemoryUsage
+        ToVma(MemoryUsage p_usage) noexcept {
+            return static_cast<VmaMemoryUsage>(p_usage);
+        }
+
+        [[nodiscard]] constexpr VkBufferUsageFlags
+        ToVk(UsageFlags p_flags) noexcept {
+            return static_cast<VkBufferUsageFlags>(p_flags);
+        }
+
 		enum class PipelineStage : uint32_t {
 			ComputeShader = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 			VertexShader = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
@@ -84,6 +102,8 @@ namespace Blokk {
 			Transfer = VK_PIPELINE_STAGE_TRANSFER_BIT,
 			TopOpipe = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT
 		};
+
+
 
 		Window* m_Window;
 		EngineCore& m_Engine;
@@ -150,6 +170,7 @@ namespace Blokk {
 		AllocatedBuffer m_PositionsBuffer;
 		AllocatedBuffer m_AnimationNumbersBuffer;
 		AllocatedBuffer m_FrameNumbersBuffer;
+        AllocatedBuffer m_RenderPositionsBuffer;
 
 		AllocatedBuffer m_IndirectDrawBuffer;
 		AllocatedBuffer m_VisibleIndexesBuffer;
@@ -167,12 +188,14 @@ namespace Blokk {
 		std::vector<VmaAllocation> m_LoadedAllocations;
 
 		void init_vulkan(GLFWwindow* window);
-		vkb::PhysicalDevice SelectPhysicalDevice();
+        vkb::PhysicalDevice SelectPhysicalDevice(vkb::Instance vkb_instance);
 		vkb::Device BuildLogicalDevice(vkb::PhysicalDevice vkb_phys_device);
 		void CreateVMAMemoryAllocator();
 
-		void CreateGraphicsQueues(vkb::Device vkb_device);
+		void CreateCommandPoolAndBuffers(); 
+		void CreateGraphicsQueues();
 		void CreateSwapchain();
+        void CreateSemaphoresAndFences();
 
 		void CreateMemoryBarriers();
 		void CreateComputeShaderLayout();
@@ -182,7 +205,7 @@ namespace Blokk {
 		inline void CmdComputeToDrawBarrier();
 		inline void CmdTransferToComputeBarrier();
 
-		AllocatedBuffer CreateAndMapBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
+		AllocatedBuffer CreateAndMapBuffer(VkDeviceSize size, UsageFlags Usage, MemoryUsage memoryUsage);
 		void CreateAndMapAllBuffers(GPUPipelineCreationData& data);
 		void SubmitCommandBuffersAndWait(int32_t cmdBufferCount) const;
 
@@ -206,6 +229,7 @@ namespace Blokk {
 		void BulkAddDataToGPUBuffers(const BulkObjectCreationData& Data);
 		void BulkDeleteObjects(std::vector<uint32_t>& Indexes);
 
+		std::vector<uint32_t> LoadShaderFile(const std::string& _filePath);
 		VkShaderModule CreateShaderModule(VkDevice device, std::span<const unsigned char> bytecode);
 		VkPipeline CreateComputePipeline(std::span<const unsigned char> bytecode);
 		void LoadAndStoreShaders();

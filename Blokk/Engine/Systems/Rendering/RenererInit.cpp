@@ -1,23 +1,23 @@
-#include "Rendering.hpp"
-
-#include <GLFW/glfw3.h>
 #include <VkBootstrap.h>
-#include <vulkan/vulkan.h>
+#include <Volk/volk.h>
+#include <GLFW/glfw3.h>
 
 #include "../EngineClassData.hpp"
+#include "Rendering.hpp"
+#include "Shaders/ShaderBytecodes.h"
+#include "Window/Window.hpp"
 #include "types.hpp"
 
-#include "Shaders/ShaderBytecodes.h"
+#include <fstream>
 
 namespace Blokk {
 
-    Renderer::Renderer(GLFWwindow& p_Window, EngineCore& p_Engine) : 
-        m_Window(p_Window), 
+    Renderer::Renderer(Window& p_Window, EngineCore& p_Engine) : 
+        m_Window(&p_Window), 
         m_Engine(p_Engine) 
     {
-        auto counts = m_Engine.GPUObjectCount;
-        m_GPU_ObjectCount = {counts.Total, counts.Dynamic, counts.Static};
-        init_vulkan(&p_Window);
+        m_GPU_ObjectCount = m_Engine.GPUObjectCount.Total;
+        init_vulkan(p_Window.GetNativeWindow());
     }
     
     Renderer::~Renderer() {
@@ -50,7 +50,7 @@ namespace Blokk {
     void Renderer::CreateAndMapAllBuffers(GPUPipelineCreationData& data) 
     {
         // Helpers 
-        uint32_t allocationSize = data.MaxObjects;
+        uint32_t allocationSize = data.MaxObjectsAtOnce;
         uint32_t vec2allocationSize = allocationSize * sizeof(glm::vec2);
         uint32_t uintallocationSize = allocationSize * sizeof(uint32_t);
 
@@ -63,8 +63,8 @@ namespace Blokk {
                 UsageFlags::STORAGE_BUFFER | UsageFlags::INDIRECT_BUFFER | 
                 UsageFlags::TRANSFER_DST, MemoryUsage::GPU_ONLY);
 
-            m_ValidIndexesBuffer = CreateAndMapBuffer(uintallocationSize, UsageFlags::TRANSFER_SRC, MemoryUsage::GPU_ONLY);
-            vkCmdFillBuffer(m_CommandBuffer, m_ValidIndexesBuffer.buffer, 0, uintallocationSize, 0);
+            m_VisibleIndexesBuffer = CreateAndMapBuffer(uintallocationSize, UsageFlags::TRANSFER_SRC, MemoryUsage::GPU_ONLY);
+            vkCmdFillBuffer(m_CommandBuffer, m_VisibleIndexesBuffer.buffer, 0, uintallocationSize, 0);
         }
 
         {
@@ -75,7 +75,7 @@ namespace Blokk {
 
             // Fill with 0
             std::memset(m_DeletionStagingBuffer.mappedData, 0, deletionAllocationSize); 
-            ::vkCmdFillBuffer(m_CommandBuffer, m_IndexesToDeleteBuffer, 0, deletionAllocationSize, 0);
+            ::vkCmdFillBuffer(m_CommandBuffer, m_IndexesToDeleteBuffer.buffer, 0, deletionAllocationSize, 0);
         }
 
         // Buffers that are sent ONCE at the start to the GPU. 
@@ -83,6 +83,7 @@ namespace Blokk {
         auto StartingVelocities = CreateAndMapBuffer(vec2allocationSize, UsageFlags::TRANSFER_SRC, MemoryUsage::CPU_TO_GPU);
         auto StartingPositions = CreateAndMapBuffer(vec2allocationSize, UsageFlags::TRANSFER_SRC, MemoryUsage::CPU_TO_GPU);
         auto StartingFrameNumbers = CreateAndMapBuffer(uintallocationSize, UsageFlags::TRANSFER_SRC, MemoryUsage::CPU_TO_GPU);
+        auto StartingAnimationNumbers = CreateAndMapBuffer(uintallocationSize, UsageFlags::TRANSFER_SRC, MemoryUsage::CPU_TO_GPU);
 
         {
             // Buffers that are used for the compute shaders to read/write to every frame
@@ -92,10 +93,10 @@ namespace Blokk {
             m_FrameNumbersBuffer = CreateAndMapBuffer(uintallocationSize, UsageFlags::STORAGE_BUFFER, MemoryUsage::GPU_ONLY);
             
             // FIXED: Vector is passed first, AllocatedBuffer is passed second
-            SendDataToGPUBuffer<glm::vec2>(m_Engine.StartingVelocities, StartingVelocities, 0);
-            SendDataToGPUBuffer<glm::vec2>(m_Engine.StartingPositions, StartingPositions, 0);
-            SendDataToGPUBuffer<uint32_t>(m_Engine.StartingFrameNumbers, StartingFrameNumbers, 0);
-            SendDataToGPUBuffer<uint32_t>(m_Engine.StartingAnimationNumbers, m_AnimationNumbersBuffer, 0);
+            SendDataToGPUBuffer<glm::vec2>(m_Engine.m_StartingVelocities, StartingVelocities, 0);
+            SendDataToGPUBuffer<glm::vec2>(m_Engine.m_StartingPositions, StartingPositions, 0);
+            SendDataToGPUBuffer<uint32_t>(m_Engine.m_StartingFrameNumbers, StartingFrameNumbers, 0);
+            SendDataToGPUBuffer<uint32_t>(m_Engine.m_StartingAnimationNumbers, StartingAnimationNumbers, 0);
 
             // Region to copy from the starting buffers to the persistent buffers
             VkBufferCopy copyRegion = CreateBufferCopyRegion(0, 0, vec2allocationSize);
@@ -107,7 +108,7 @@ namespace Blokk {
             ::vkCmdCopyBuffer(m_CommandBuffer, StartingFrameNumbers.buffer, m_FrameNumbersBuffer.buffer, 1, &copyRegion);
 
             // Memory barrier
-            CmdTransferToCompute();
+            CmdTransferToComputeBarrier();
         }
 
         EndCommandBuffer();
@@ -119,20 +120,20 @@ namespace Blokk {
         DestroyBuffer(StartingFrameNumbers);
     }
 
-    Renderer::AllocatedBuffer Renderer::CreateAndMapBuffer(VkDeviceSize size, VkBufferUsageFlags VkUsage, VmaMemoryUsage memoryUsage) 
+    Renderer::AllocatedBuffer Renderer::CreateAndMapBuffer(VkDeviceSize size, UsageFlags Usage, MemoryUsage memoryUsage) 
     {
         // Tell Vulkan what the buffer will be used for and how large it is (in bytes)
         VkBufferCreateInfo bufferInfo{
             .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
             .size = size, // Total size in BYTES (e.g., count * sizeof(DataType))
-            .usage = VkUsage,
+            .usage = ToVk(Usage),
             .sharingMode = VK_SHARING_MODE_EXCLUSIVE
         };
 
         // Tell VMA how to allocate memory
         VmaAllocationCreateInfo allocInfo{
             .flags = VMA_ALLOCATION_CREATE_MAPPED_BIT, // Automatically maps a CPU pointer for us
-            .usage = memoryUsage 
+            .usage = ToVma(memoryUsage) 
         };
 
         AllocatedBuffer gpuBuffer;
@@ -174,7 +175,7 @@ namespace Blokk {
 
         // Unpack fully initialized instance helper
         vkb::Instance vkb_instance = instance_result.value();
-        m_Instance = vkb_instance.instance();
+        m_Instance = vkb_instance.instance;
 
         VkSurfaceKHR surface; // Window surface
         if (glfwCreateWindowSurface(vkb_instance.instance, window, nullptr, &surface) != VK_SUCCESS) {
@@ -359,7 +360,7 @@ namespace Blokk {
             .dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT,
             .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
             .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .buffer = m_RenderPositionsBuffer.buffer, // Your u10 buffer handle
+            .buffer = m_RenderPositionsBuffer.buffer, 
             .offset = 0,
             .size = VK_WHOLE_SIZE
         };
@@ -496,7 +497,7 @@ namespace Blokk {
     vkb::PhysicalDevice Renderer::SelectPhysicalDevice(vkb::Instance vkb_instance) {
         vkb::PhysicalDeviceSelector selector{ vkb_instance };
     
-        auto phys_device_result = selector.set_surface(surface)
+        auto phys_device_result = selector.set_surface(m_Surface)
                                           .set_minimum_version(1, 3)
                                           .select();
 
@@ -507,20 +508,26 @@ namespace Blokk {
         }
     
         vkb::PhysicalDevice vkb_phys_device = phys_device_result.value();
-        m_PhysicalDevice = vkb_phys_device.physical_device();
+        m_PhysicalDevice = vkb_phys_device.physical_device;
 
         return vkb_phys_device;
     }
 
-    void Renderer::CreateVMAMemoryAllocator() {
+    void Renderer::CreateVMAMemoryAllocator()
+    {
+        VmaVulkanFunctions vulkanFunctions{
+            .vkGetInstanceProcAddr = vkGetInstanceProcAddr,
+            .vkGetDeviceProcAddr = vkGetDeviceProcAddr};
+
         VmaAllocatorCreateInfo allocatorCreateInfo{
             .physicalDevice = m_PhysicalDevice,
             .device = m_Device,
+            .pVulkanFunctions = &vulkanFunctions,
             .instance = m_Instance,
-            .vulkanApiVersion = VK_API_VERSION_1_3
-        };
+            .vulkanApiVersion = VK_API_VERSION_1_3};
 
-        if (vmaCreateAllocator(&allocatorCreateInfo, &m_Allocator) != VK_SUCCESS) {
+        if (vmaCreateAllocator(&allocatorCreateInfo, &m_Allocator) !=
+            VK_SUCCESS) {
             throw std::runtime_error("Failed to create VMA allocator!");
         }
     }
@@ -557,7 +564,8 @@ namespace Blokk {
         vkb::SwapchainBuilder swapchain_builder{ m_VkbDevice };
     
         // Images need to match window's width and height (e.g., 800x600)
-        auto width = static_cast<uint32_t>(m_Window.GetWidth()); auto height = static_cast<uint32_t>(m_Window.GetHeight());
+        glm::vec2 windowDimensions = m_Window->GetDimensions();
+        auto width = windowDimensions.x; auto height = windowDimensions.y;
         auto swapchain_result = swapchain_builder.set_desired_extent(width, height).build();
 
         if (!swapchain_result) {
@@ -681,10 +689,10 @@ namespace Blokk {
 
     void Renderer::LoadAndStoreShaders()
     {
-        m_VelocitiesPipeline      = CreateComputePipeline(VelocitiesShader);
-        m_RenderCullingPipeline   = CreateComputePipeline(CullingShader);
-        m_ObjectDeletionPipeline  = CreateComputePipeline(DeletionShader);
-        m_FrameIndexesPipeline    = CreateComputePipeline(FrameIndexesShader); // Replace with your actual member name
+        m_VelocitiesPipeline = CreateComputePipeline(VelocitiesShader);
+        m_RenderCullingPipeline = CreateComputePipeline(CullingShader);
+        m_ObjectDeletionPipeline = CreateComputePipeline(DeletionShader);
+        m_FrameNumberUpdatePipeline = CreateComputePipeline(FrameIndexesShader); 
     }
 
     void Renderer::CreateBindlessDescriptorLayout()
@@ -694,7 +702,7 @@ namespace Blokk {
             .binding = 0,
             .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             .descriptorCount = 1024, // Max number of bindless textures
-            .stageFlags = VK_SHADER_STAGE_FRAGMENT_SHADER_BIT,
+            .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
             .pImmutableSamplers = nullptr
         };
 
